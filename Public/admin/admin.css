@@ -189,6 +189,64 @@ body.admin-body.is-ready .admin-layout {
     gap: 12px;
 }
 
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sidebar-menu-toggle {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(243, 155, 29, 0.44);
+    background: rgba(18, 9, 9, 0.5);
+    color: #fff;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.sidebar-menu-toggle:hover {
+    background: rgba(243, 155, 29, 0.2);
+}
+
+.sidebar-menu-toggle:focus-visible {
+    outline: 2px solid rgba(243, 155, 29, 0.8);
+    outline-offset: 2px;
+}
+
+.sidebar-menu-toggle-icon {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    width: 14px;
+}
+
+.sidebar-menu-toggle-icon span {
+    width: 100%;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.sidebar.is-open .sidebar-menu-toggle-icon span:nth-child(1) {
+    transform: translateY(5px) rotate(45deg);
+}
+
+.sidebar.is-open .sidebar-menu-toggle-icon span:nth-child(2) {
+    opacity: 0;
+}
+
+.sidebar.is-open .sidebar-menu-toggle-icon span:nth-child(3) {
+    transform: translateY(-5px) rotate(-45deg);
+}
+
 .brand-logo {
     width: 78px;
     height: 68px;
@@ -2049,33 +2107,46 @@ body.admin-body.is-ready .admin-layout {
     .sidebar {
         width: 100%;
         flex-direction: column;
-        align-items: center;
-        justify-content: flex-start;
-        flex-wrap: wrap;
-        padding: 18px 14px 14px;
-        gap: 14px;
+        align-items: stretch;
+        padding: 14px;
+        gap: 0;
         border-right: 0;
         border-bottom: 1px solid rgba(243, 155, 29, 0.26);
+        position: sticky;
+        top: 0;
+        z-index: 20;
+    }
+
+    .sidebar-header {
+        width: 100%;
+        align-items: center;
     }
 
     .brand {
-        width: 100%;
+        width: auto;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sidebar-menu-toggle {
+        display: inline-flex;
+        flex-shrink: 0;
     }
 
     .sidebar .nav {
         width: 100%;
+        display: none;
+        flex-direction: column;
+        gap: 0;
+        margin-top: 12px;
+        border: 1px solid rgba(243, 155, 29, 0.3);
+        border-radius: 12px;
+        background: rgba(15, 7, 7, 0.74);
+        overflow: hidden;
+    }
+
+    .sidebar.is-open .nav {
         display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        gap: 8px;
-        overflow-x: auto;
-        padding-bottom: 4px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
-        margin-top: 0;
     }
 
     .sidebar .nav::after {
@@ -2084,8 +2155,8 @@ body.admin-body.is-ready .admin-layout {
 
     .sidebar .nav-link {
         margin-bottom: 0;
-        flex: 0 0 auto;
-        white-space: nowrap;
+        width: 100%;
+        white-space: normal;
         padding: 10px 14px;
         border: 0;
         border-bottom: 1px solid rgba(243, 155, 29, 0.26);
@@ -2093,7 +2164,7 @@ body.admin-body.is-ready .admin-layout {
     }
 
     .sidebar .nav-link:last-child {
-        border-bottom: 1px solid rgba(243, 155, 29, 0.26);
+        border-bottom: 0;
     }
 
     .sidebar .nav-link::before {
