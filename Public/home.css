@@ -90,6 +90,36 @@ a {
     color: inherit
 }
 
+/* Ensure button hit-areas stay on top and fully clickable */
+button,
+a[role="button"],
+.btn,
+[class*="-btn"] {
+    position: relative;
+    z-index: 5;
+    pointer-events: auto;
+    touch-action: manipulation
+}
+
+/* Button-like links should size to their padding */
+a[role="button"],
+.btn,
+[class*="-btn"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center
+}
+
+/* Decorative overlays should never block clicks */
+[class*="-section"]::before,
+[class*="-section"]::after,
+[class*="-hero"]::before,
+[class*="-hero"]::after,
+[class*="-card"]::before,
+[class*="-card"]::after {
+    pointer-events: none
+}
+
 .site-header {
     position: relative;
     z-index: 1000
