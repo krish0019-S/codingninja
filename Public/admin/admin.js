@@ -814,7 +814,7 @@ $(function () {
             var content = escapeHtml(item && item.content);
             var imageUrl = normalizeNewsUrl(item && item.imageUrl);
             var contentLink = normalizeNewsUrl(item && item.contentLink);
-            var linkUrl = contentLink || imageUrl;
+            var linkUrl = contentLink;
             var linkText = linkUrl
                 ? String(linkUrl).replace(/^https?:\/\//i, "")
                 : "-";
@@ -822,9 +822,9 @@ $(function () {
             var imageHtml = imageUrl
                 ? (
                     '<div class="news-item-media">' +
-                        '<div class="news-item-image-link news-item-image-static">' +
+                        '<a class="news-item-image-link" href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
                             '<img class="news-item-image" src="' + escapeHtml(imageUrl) + '" alt="' + title + ' image" loading="lazy">' +
-                        "</div>" +
+                        "</a>" +
                     "</div>"
                 )
                 : '<div class="news-item-media news-item-media-empty"><span class="news-item-image-empty">No image</span></div>';
