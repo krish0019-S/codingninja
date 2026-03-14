@@ -82,13 +82,31 @@ var isUploadValidationError = function (message) {
 var normalizeFolderName = function (name) {
     var raw = String(name || "")
         .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9_-]+/g, "-")
+        .replace(/[^a-zA-Z0-9_-]+/g, "-")
         .replace(/^-+|-+$/g, "");
     if (!raw || !GALLERY_FOLDER_REGEX.test(raw)) {
         return "";
     }
     return raw;
+};
+
+var folderKey = function (name) {
+    return String(name || "").toLowerCase();
+};
+
+var buildFolderMap = function (folders) {
+    var map = new Map();
+    (Array.isArray(folders) ? folders : []).forEach(function (name) {
+        var normalized = normalizeFolderName(name);
+        if (!normalized) {
+            return;
+        }
+        var key = folderKey(normalized);
+        if (!map.has(key)) {
+            map.set(key, normalized);
+        }
+    });
+    return map;
 };
 
 var getFolderNameFromReq = function (req) {
@@ -157,7 +175,7 @@ var listGalleryFolders = async function () {
             return entry.isDirectory() && GALLERY_FOLDER_REGEX.test(entry.name);
         })
         .map(function (entry) {
-            return String(entry.name).toLowerCase();
+            return String(entry.name);
         })
         .sort();
 };
@@ -172,8 +190,9 @@ var readGalleryFolderOrder = async function () {
 
         list.forEach(function (name) {
             var folderName = normalizeFolderName(name);
-            if (folderName && !seen.has(folderName)) {
-                seen.add(folderName);
+            var key = folderKey(folderName);
+            if (folderName && !seen.has(key)) {
+                seen.add(key);
                 normalized.push(folderName);
             }
         });
@@ -195,8 +214,9 @@ var writeGalleryFolderOrder = async function (order) {
 
     source.forEach(function (name) {
         var folderName = normalizeFolderName(name);
-        if (folderName && !seen.has(folderName)) {
-            seen.add(folderName);
+        var key = folderKey(folderName);
+        if (folderName && !seen.has(key)) {
+            seen.add(key);
             normalized.push(folderName);
         }
     });
@@ -212,28 +232,31 @@ var writeGalleryFolderOrder = async function (order) {
 
 var syncGalleryFolderOrder = async function (folders) {
     var physicalFolders = Array.isArray(folders) ? folders.slice() : [];
+    var physicalMap = buildFolderMap(physicalFolders);
     var currentOrder = await readGalleryFolderOrder();
-    var physicalSet = new Set(physicalFolders);
     var merged = [];
+    var used = new Set();
 
     currentOrder.forEach(function (name) {
-        if (physicalSet.has(name)) {
-            merged.push(name);
-            physicalSet.delete(name);
+        var normalized = normalizeFolderName(name);
+        var key = folderKey(normalized);
+        if (physicalMap.has(key) && !used.has(key)) {
+            merged.push(physicalMap.get(key));
+            used.add(key);
         }
     });
 
-    physicalFolders.forEach(function (name) {
-        if (physicalSet.has(name)) {
-            merged.push(name);
-            physicalSet.delete(name);
+    physicalMap.forEach(function (value, key) {
+        if (!used.has(key)) {
+            merged.push(value);
+            used.add(key);
         }
     });
 
     var changed =
         merged.length !== currentOrder.length ||
         merged.some(function (name, index) {
-            return currentOrder[index] !== name;
+            return folderKey(currentOrder[index]) !== folderKey(name);
         });
 
     if (changed) {
@@ -258,20 +281,25 @@ var reorderGalleryFolderSequence = async function (folderName, targetSequence) {
     }
 
     var physicalFolders = await listGalleryFolders();
-    if (!physicalFolders.includes(normalizedName)) {
+    var physicalMap = buildFolderMap(physicalFolders);
+    var key = folderKey(normalizedName);
+    if (!physicalMap.has(key)) {
         throw new Error("Folder not found.");
     }
 
     var orderedFolders = await syncGalleryFolderOrder(physicalFolders);
-    var currentIndex = orderedFolders.indexOf(normalizedName);
+    var currentIndex = orderedFolders.findIndex(function (name) {
+        return folderKey(name) === key;
+    });
     if (currentIndex === -1) {
         throw new Error("Folder not found.");
     }
 
     var clampedIndex = Math.max(0, Math.min(targetSequence - 1, orderedFolders.length - 1));
     if (currentIndex !== clampedIndex) {
+        var actualName = physicalMap.get(key);
         orderedFolders.splice(currentIndex, 1);
-        orderedFolders.splice(clampedIndex, 0, normalizedName);
+        orderedFolders.splice(clampedIndex, 0, actualName);
         await writeGalleryFolderOrder(orderedFolders);
     }
 
@@ -402,7 +430,7 @@ var listVideoGalleryFolders = async function () {
             return entry.isDirectory() && GALLERY_FOLDER_REGEX.test(entry.name);
         })
         .map(function (entry) {
-            return String(entry.name).toLowerCase();
+            return String(entry.name);
         })
         .sort();
 };
@@ -417,8 +445,9 @@ var readVideoFolderOrder = async function () {
 
         list.forEach(function (name) {
             var folderName = normalizeFolderName(name);
-            if (folderName && !seen.has(folderName)) {
-                seen.add(folderName);
+            var key = folderKey(folderName);
+            if (folderName && !seen.has(key)) {
+                seen.add(key);
                 normalized.push(folderName);
             }
         });
@@ -440,8 +469,9 @@ var writeVideoFolderOrder = async function (order) {
 
     source.forEach(function (name) {
         var folderName = normalizeFolderName(name);
-        if (folderName && !seen.has(folderName)) {
-            seen.add(folderName);
+        var key = folderKey(folderName);
+        if (folderName && !seen.has(key)) {
+            seen.add(key);
             normalized.push(folderName);
         }
     });
@@ -457,27 +487,31 @@ var writeVideoFolderOrder = async function (order) {
 
 var syncVideoFolderOrder = async function (folders) {
     var physicalFolders = Array.isArray(folders) ? folders.slice() : [];
+    var physicalMap = buildFolderMap(physicalFolders);
     var currentOrder = await readVideoFolderOrder();
-    var physicalSet = new Set(physicalFolders);
     var merged = [];
+    var used = new Set();
 
     currentOrder.forEach(function (name) {
-        if (physicalSet.has(name)) {
-            merged.push(name);
-            physicalSet.delete(name);
+        var normalized = normalizeFolderName(name);
+        var key = folderKey(normalized);
+        if (physicalMap.has(key) && !used.has(key)) {
+            merged.push(physicalMap.get(key));
+            used.add(key);
         }
     });
 
-    Array.from(physicalSet)
-        .sort()
-        .forEach(function (name) {
-            merged.push(name);
-        });
+    physicalMap.forEach(function (value, key) {
+        if (!used.has(key)) {
+            merged.push(value);
+            used.add(key);
+        }
+    });
 
     var changed =
         merged.length !== currentOrder.length ||
         merged.some(function (name, index) {
-            return currentOrder[index] !== name;
+            return folderKey(currentOrder[index]) !== folderKey(name);
         });
 
     if (changed) {
@@ -502,20 +536,25 @@ var reorderVideoFolderSequence = async function (folderName, targetSequence) {
     }
 
     var physicalFolders = await listVideoGalleryFolders();
-    if (!physicalFolders.includes(normalizedName)) {
+    var physicalMap = buildFolderMap(physicalFolders);
+    var key = folderKey(normalizedName);
+    if (!physicalMap.has(key)) {
         throw new Error("Folder not found.");
     }
 
     var orderedFolders = await syncVideoFolderOrder(physicalFolders);
-    var currentIndex = orderedFolders.indexOf(normalizedName);
+    var currentIndex = orderedFolders.findIndex(function (name) {
+        return folderKey(name) === key;
+    });
     if (currentIndex === -1) {
         throw new Error("Folder not found.");
     }
 
     var clampedIndex = Math.max(0, Math.min(targetSequence - 1, orderedFolders.length - 1));
     if (currentIndex !== clampedIndex) {
+        var actualName = physicalMap.get(key);
         orderedFolders.splice(currentIndex, 1);
-        orderedFolders.splice(clampedIndex, 0, normalizedName);
+        orderedFolders.splice(clampedIndex, 0, actualName);
         await writeVideoFolderOrder(orderedFolders);
     }
 
@@ -652,6 +691,11 @@ router.get("/", function (req, res) {
     res.sendFile(filePath);
 });
 
+router.get("/login", function (req, res) {
+    var filePath = path.join(__dirname, "..", "Public", "admin", "login.html");
+    res.sendFile(filePath);
+});
+
 router.get("/news-items-public", async function (req, res) {
     try {
         var state = await newsItems.getNewsState();
@@ -776,6 +820,36 @@ router.delete("/news-items/:id", adminAuth, async function (req, res) {
     }
 });
 
+router.post("/news-items/reorder", adminAuth, async function (req, res) {
+    try {
+        var newsId = Number(getRequestValue(req, "id"));
+        var sequence = Number(getRequestValue(req, "sequence"));
+        if (!Number.isInteger(newsId) || newsId <= 0) {
+            return res.status(400).json({ ok: false, message: "Invalid news id." });
+        }
+        if (!Number.isInteger(sequence) || sequence < 1) {
+            return res.status(400).json({ ok: false, message: "Invalid sequence." });
+        }
+        var items = await newsItems.reorderNewsSequence(newsId, sequence);
+        if (!items) {
+            return res.status(404).json({ ok: false, message: "News item not found." });
+        }
+        var paused = await newsItems.isNewsPaused();
+        return res.json({
+            ok: true,
+            message: "News sequence updated successfully.",
+            items: items,
+            paused: paused,
+        });
+    } catch (error) {
+        if (error && error.statusCode === 400) {
+            return res.status(400).json({ ok: false, message: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ ok: false, message: "Unable to update news sequence." });
+    }
+});
+
 router.get("/carousel", adminAuth, async function (req, res) {
     try {
         var banners = await carouselBanners.listCarouselBanners();
@@ -813,7 +887,21 @@ router.post("/gallery-folders", adminAuth, async function (req, res) {
     }
 
     try {
+        var existing = await listGalleryFolders();
+        var folderKeyValue = folderKey(folderName);
+        if (existing.some(function (name) {
+            return folderKey(name) === folderKeyValue;
+        })) {
+            return res.status(409).json({ ok: false, message: "Folder already exists." });
+        }
         await ensureGalleryFolderDir(folderName);
+        var order = await readGalleryFolderOrder();
+        var key = folderKey(folderName);
+        order = order.filter(function (name) {
+            return folderKey(name) !== key;
+        });
+        order.unshift(folderName);
+        await writeGalleryFolderOrder(order);
         var folders = await listGalleryFoldersOrdered();
         return res.json({
             ok: true,
@@ -1108,7 +1196,21 @@ router.post("/video-folders", adminAuth, async function (req, res) {
     }
 
     try {
+        var existing = await listVideoGalleryFolders();
+        var folderKeyValue = folderKey(folderName);
+        if (existing.some(function (name) {
+            return folderKey(name) === folderKeyValue;
+        })) {
+            return res.status(409).json({ ok: false, message: "Folder already exists." });
+        }
         await ensureVideoGalleryFolderDir(folderName);
+        var order = await readVideoFolderOrder();
+        var key = folderKey(folderName);
+        order = order.filter(function (name) {
+            return folderKey(name) !== key;
+        });
+        order.unshift(folderName);
+        await writeVideoFolderOrder(order);
         var folders = await listVideoGalleryFoldersOrdered();
         return res.json({
             ok: true,

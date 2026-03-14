@@ -1,6 +1,7 @@
 $(function () {
     var TOKEN_KEY = "rc_admin_token";
     var TOKEN_EXP_KEY = "rc_admin_token_exp";
+    var LOGIN_PAGE = "/admin/login";
 
     var loginModalEl = document.getElementById("adminLoginModal");
     var resetModalEl = document.getElementById("adminResetModal");
@@ -30,10 +31,16 @@ $(function () {
     var dashboardEndedProjects = $("#dashboardEndedProjects");
     var dashboardPhotoFolders = $("#dashboardPhotoFolders");
     var dashboardVideoFolders = $("#dashboardVideoFolders");
+    var dashboardPhotoCount = $("#dashboardPhotoCount");
+    var dashboardVideoCount = $("#dashboardVideoCount");
+    var dashboardPhotoDelta = $("#dashboardPhotoDelta");
+    var dashboardVideoDelta = $("#dashboardVideoDelta");
     var dashboardEnquiryQueue = $("#dashboardEnquiryQueue");
     var dashboardNewsCount = $("#dashboardNewsCount");
-    var dashboardAnalyticsBars = $("#dashboardAnalyticsBars");
-    var dashboardAnalyticsScaleLabels = $(".analytics-level-scale span");
+    var dashboardSliderDelta = $("#dashboardSliderDelta");
+    var dashboardEnquiriesDelta = $("#dashboardEnquiriesDelta");
+    var dashboardNewsDelta = $("#dashboardNewsDelta");
+    var dashboardAnalyticsChartEl = document.getElementById("dashboardAnalyticsChart");
     var dashboardAnalyticsStats = $("#dashboardAnalyticsStats");
     var dashboardLiveClock = $("#dashboardLiveClock");
     var dashboardProgressRing = $("#dashboardProgressRing");
@@ -93,13 +100,20 @@ $(function () {
     var currentVideoFolder = "";
     var currentVideoFolderOrder = [];
     var dashboardMetrics = {
-        banners: 0,
+        videos: 0,
+        images: 0,
+        slider: 0,
+        news: 0,
         enquiries: 0,
         imageFolders: 0,
+        imageFiles: 0,
         videoFolders: 0,
-        newsItems: 0,
+        videoFiles: 0,
     };
     var dashboardClockTimer = null;
+    var dashboardAnalyticsChart = null;
+    var analyticsRefreshTimer = null;
+    var lastAnalyticsSnapshot = null;
     var NEWS_GALLERY_FOLDER = "news";
     var NEWS_CONTENT_MAX_LENGTH = 1210;
 
@@ -220,10 +234,33 @@ $(function () {
         }, 5000);
     };
 
+    var alertTimer = null;
+
+    var hideAlert = function () {
+        var alertBox = $("#alertBox");
+        if (!alertBox.length) {
+            return;
+        }
+        alertBox.addClass("d-none").removeClass("alert-success alert-danger").text("");
+    };
+
     var showAlert = function (message, type) {
         var alertBox = $("#alertBox");
+        if (!alertBox.length) {
+            return;
+        }
+        if (currentView === "dashboard") {
+            hideAlert();
+            return;
+        }
         alertBox.removeClass("d-none alert-success alert-danger").addClass("alert-" + type);
         alertBox.text(message);
+        if (alertTimer) {
+            window.clearTimeout(alertTimer);
+        }
+        alertTimer = window.setTimeout(function () {
+            hideAlert();
+        }, 2000);
     };
 
     var looksLikeEmail = function (value) {
@@ -330,13 +367,22 @@ $(function () {
         return true;
     };
 
+    var redirectToLogin = function () {
+        if (window.location.pathname === LOGIN_PAGE) {
+            return;
+        }
+        var next = String(window.location.pathname || "") +
+            String(window.location.search || "") +
+            String(window.location.hash || "");
+        var target = LOGIN_PAGE + "?next=" + encodeURIComponent(next || "/admin");
+        window.location.replace(target);
+    };
+
     var ensureAuth = function () {
         if (tokenValid()) {
             return true;
         }
-        if (loginModal) {
-            loginModal.show();
-        }
+        redirectToLogin();
         return false;
     };
 
@@ -389,9 +435,7 @@ $(function () {
     var handleAuthError = function (xhr) {
         if (xhr && xhr.status === 401) {
             clearAuth();
-            if (loginModal) {
-                loginModal.show();
-            }
+            redirectToLogin();
             if (currentView === "dashboard") {
                 resetDashboardMetrics();
             } else if (currentView === "enquiries") {
@@ -791,8 +835,11 @@ $(function () {
 
     var setNewsPauseState = function (paused) {
         newsScrollPaused = paused === true;
-        newsPauseStatus.text("Scroll: " + (newsScrollPaused ? "Paused" : "Running"));
-        toggleNewsPauseBtn.text(newsScrollPaused ? "Resume Scroll" : "Pause Scroll");
+        var isRunning = !newsScrollPaused;
+        newsPauseStatus.text(isRunning ? "News scroll running" : "News scroll paused");
+        toggleNewsPauseBtn.toggleClass("is-on", isRunning);
+        toggleNewsPauseBtn.attr("aria-checked", isRunning ? "true" : "false");
+        toggleNewsPauseBtn.attr("aria-label", isRunning ? "Pause news scroll" : "Resume news scroll");
     };
 
     var renderNewsItems = function (items) {
@@ -819,6 +866,11 @@ $(function () {
                 ? String(linkUrl).replace(/^https?:\/\//i, "")
                 : "-";
             var dateParts = formatDateTimeParts(item && (item.updatedAt || item.createdAt));
+            var sequence = Number(item && item.sequence);
+            if (!Number.isInteger(sequence) || sequence < 1) {
+                sequence = index + 1;
+            }
+            var sequenceOptions = buildSequenceOptions(rows.length, sequence);
             var imageHtml = imageUrl
                 ? (
                     '<div class="news-item-media">' +
@@ -852,10 +904,18 @@ $(function () {
                         '<span class="news-item-date">' + escapeHtml(dateParts.date) + "</span>" +
                         '<span class="news-item-time">' + escapeHtml(dateParts.time) + "</span>" +
                     "</div>" +
-                    '<div class="news-item-col news-item-col-actions" data-label="Action">' +
+                    '<div class="news-item-col news-item-col-actions" data-label="Order/Action">' +
                         '<div class="news-item-actions">' +
-                            '<button class="btn btn-outline-primary btn-sm btn-news-edit" type="button" data-news-id="' + String(newsId) + '">Edit</button>' +
-                            '<button class="btn btn-outline-danger btn-sm btn-news-delete" type="button" data-news-id="' + String(newsId) + '">Delete</button>' +
+                            '<div class="news-sequence-controls">' +
+                                '<select class="form-select form-select-sm news-sequence-select">' +
+                                    sequenceOptions +
+                                "</select>" +
+                                '<button class="btn btn-outline-secondary btn-sm btn-news-sequence" type="button" data-news-id="' + String(newsId) + '">Change</button>' +
+                            "</div>" +
+                            '<div class="news-action-buttons">' +
+                                '<button class="btn btn-outline-primary btn-sm btn-news-edit" type="button" data-news-id="' + String(newsId) + '">Edit</button>' +
+                                '<button class="btn btn-outline-danger btn-sm btn-news-delete" type="button" data-news-id="' + String(newsId) + '">Delete</button>' +
+                            "</div>" +
                         "</div>" +
                     "</div>" +
                 "</article>"
@@ -868,7 +928,7 @@ $(function () {
                 "<span>News</span>" +
                 "<span>Link</span>" +
                 "<span>Date/Time</span>" +
-                "<span>Action</span>" +
+                "<span>Order/Action</span>" +
             "</div>";
 
         if (!cards) {
@@ -925,13 +985,16 @@ $(function () {
     var normalizeFolderName = function (value) {
         var normalized = String(value || "")
             .trim()
-            .toLowerCase()
-            .replace(/[^a-z0-9_-]+/g, "-")
+            .replace(/[^a-zA-Z0-9_-]+/g, "-")
             .replace(/^-+|-+$/g, "");
-        if (!/^[a-z0-9][a-z0-9_-]{0,39}$/.test(normalized)) {
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,39}$/.test(normalized)) {
             return "";
         }
         return normalized;
+    };
+
+    var folderKey = function (value) {
+        return String(value || "").trim().toLowerCase();
     };
 
     var updateActiveGalleryFolderBadge = function () {
@@ -1363,6 +1426,13 @@ $(function () {
         videoFileGrid.html(cards || '<div class="col-12"><div class="banner-empty-state">No videos found in /videos/gallery.</div></div>');
     };
 
+    var renderAnalyticsTrendLine = function () {
+        if (dashboardAnalyticsChart) {
+            dashboardAnalyticsChart.resize();
+        }
+    };
+
+
     var loadVideoFiles = function () {
         if (!tokenValid()) {
             renderVideoFileEmptyState("Login required to manage video folder.");
@@ -1404,269 +1474,329 @@ $(function () {
         });
     };
 
-    var renderDashboardMetrics = function () {
-        var photoFolders = Number(dashboardMetrics.imageFolders || 0);
-        var videoFolders = Number(dashboardMetrics.videoFolders || 0);
-        var running = photoFolders + videoFolders;
-        var sliderRecords = Number(dashboardMetrics.banners || 0);
-        var enquiryQueue = Number(dashboardMetrics.enquiries || 0);
-        var newsRecords = Number(dashboardMetrics.newsItems || 0);
-        var total = sliderRecords + running + enquiryQueue;
-        var totalShareBase = total > 0 ? total : 0;
+    var coerceAnalyticsCount = function (value) {
+        var num = Number(value);
+        if (!Number.isFinite(num) || num < 0) {
+            return 0;
+        }
+        return Math.round(num);
+    };
 
-        var analyticsItems = [
-            {
-                key: "slider",
-                value: sliderRecords,
-                className: "solid",
-                shortLabel: "Slider",
-                fullLabel: "Slider Records",
-                ratio: totalShareBase > 0 ? sliderRecords / totalShareBase : 0,
-            },
-            {
-                key: "folders",
-                value: running,
-                className: "mid",
-                shortLabel: "Folders",
-                fullLabel: "Photo and video folders",
-                ratio: totalShareBase > 0 ? running / totalShareBase : 0,
-            },
-            {
-                key: "enquiry",
-                value: enquiryQueue,
-                className: "striped",
-                shortLabel: "Enquiry",
-                fullLabel: "From enquiry queue",
-                ratio: totalShareBase > 0 ? enquiryQueue / totalShareBase : 0,
-            },
-        ];
+    var normalizeAnalyticsPayload = function (payload) {
+        var source = payload && typeof payload === "object" ? payload : {};
+        var imageFiles = source.imageFiles != null ? source.imageFiles : source.images;
+        var videoFiles = source.videoFiles != null ? source.videoFiles : source.videos;
+        return {
+            videos: coerceAnalyticsCount(source.videos != null ? source.videos : videoFiles),
+            images: coerceAnalyticsCount(source.images != null ? source.images : imageFiles),
+            slider: coerceAnalyticsCount(source.slider),
+            news: coerceAnalyticsCount(source.news),
+            enquiries: coerceAnalyticsCount(source.enquiries),
+            imageFolders: coerceAnalyticsCount(source.imageFolders),
+            imageFiles: coerceAnalyticsCount(imageFiles),
+            videoFolders: coerceAnalyticsCount(source.videoFolders),
+            videoFiles: coerceAnalyticsCount(videoFiles),
+        };
+    };
 
-        var maxMetricValue = analyticsItems.reduce(function (maxValue, item) {
-            var value = Number(item && item.value);
-            if (!Number.isFinite(value) || value < 0) {
-                return maxValue;
-            }
-            return value > maxValue ? value : maxValue;
+    var analyticsPalette = [
+        { key: "videos", label: "Videos", className: "solid", color: "#2ad7b5" },
+        { key: "images", label: "Images", className: "mid", color: "#9066ff" },
+        { key: "slider", label: "Slider", className: "dark", color: "#b31217" },
+        { key: "news", label: "News", className: "striped", color: "#ff8e3b" },
+        { key: "enquiries", label: "Enquiries", className: "accent", color: "#f43f5e" },
+    ];
+
+    var buildAnalyticsItems = function (payload) {
+        var normalized = normalizeAnalyticsPayload(payload);
+        return analyticsPalette.map(function (item) {
+            return {
+                key: item.key,
+                label: item.label,
+                value: normalized[item.key],
+                className: item.className,
+                color: item.color,
+            };
+        });
+    };
+
+    var generateRandomAnalytics = function () {
+        var randomBetween = function (min, max) {
+            return Math.floor(min + Math.random() * (max - min + 1));
+        };
+
+        var images = randomBetween(12, 96);
+        var videos = randomBetween(6, 60);
+        var imageFolders = Math.max(1, Math.round(images / 12));
+        var videoFolders = Math.max(1, Math.round(videos / 10));
+
+        return {
+            videos: videos,
+            images: images,
+            slider: randomBetween(4, 36),
+            news: randomBetween(5, 42),
+            enquiries: randomBetween(3, 50),
+            imageFolders: imageFolders,
+            imageFiles: images,
+            videoFolders: videoFolders,
+            videoFiles: videos,
+        };
+    };
+
+    var updateMetricDelta = function (element, delta) {
+        if (!element || !element.length) {
+            return;
+        }
+        var value = Number(delta) || 0;
+        var text = value === 0
+            ? "No change"
+            : "Change: " + (value > 0 ? "+" : "") + String(value);
+        element
+            .removeClass("is-up is-down is-flat")
+            .addClass(value > 0 ? "is-up" : value < 0 ? "is-down" : "is-flat")
+            .text(text);
+    };
+
+    var ensureAnalyticsChart = function (seedData) {
+        if (dashboardAnalyticsChart || !dashboardAnalyticsChartEl || typeof Chart === "undefined") {
+            return;
+        }
+
+        var items = buildAnalyticsItems(seedData || dashboardMetrics);
+        var ctx = dashboardAnalyticsChartEl.getContext("2d");
+        dashboardAnalyticsChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: items.map(function (item) {
+                    return item.label;
+                }),
+                datasets: [{
+                    label: "Records",
+                    data: items.map(function (item) {
+                        return item.value;
+                    }),
+                    backgroundColor: items.map(function (item) {
+                        return item.color;
+                    }),
+                    borderColor: items.map(function (item) {
+                        return item.color;
+                    }),
+                    borderWidth: 1.2,
+                    borderRadius: 12,
+                    borderSkipped: false,
+                    maxBarThickness: 46,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 900,
+                    easing: "easeOutQuart",
+                },
+                plugins: {
+                    legend: {
+                        display: false,
+                    },
+                    tooltip: {
+                        backgroundColor: "#0f172a",
+                        titleColor: "#f8fafc",
+                        bodyColor: "#e2e8f0",
+                        padding: 12,
+                        displayColors: false,
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false,
+                        },
+                        ticks: {
+                            color: "#475569",
+                            font: {
+                                weight: "600",
+                            },
+                        },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: "#64748b",
+                            precision: 0,
+                        },
+                        grid: {
+                            color: "rgba(15, 23, 42, 0.08)",
+                        },
+                    },
+                },
+            },
+        });
+    };
+
+    var updateAnalyticsChart = function (items) {
+        if (!dashboardAnalyticsChart) {
+            ensureAnalyticsChart(items.reduce(function (acc, item) {
+                acc[item.key] = item.value;
+                return acc;
+            }, {}));
+        }
+        if (!dashboardAnalyticsChart) {
+            return;
+        }
+
+        dashboardAnalyticsChart.data.labels = items.map(function (item) {
+            return item.label;
+        });
+        dashboardAnalyticsChart.data.datasets[0].data = items.map(function (item) {
+            return item.value;
+        });
+        dashboardAnalyticsChart.data.datasets[0].backgroundColor = items.map(function (item) {
+            return item.color;
+        });
+        dashboardAnalyticsChart.data.datasets[0].borderColor = items.map(function (item) {
+            return item.color;
+        });
+        dashboardAnalyticsChart.update();
+    };
+
+    var updateAnalyticsStats = function (items) {
+        if (!dashboardAnalyticsStats.length) {
+            return;
+        }
+
+        var total = items.reduce(function (sum, item) {
+            return sum + (Number(item.value) || 0);
         }, 0);
 
-        var scaleMax = 100;
-        if (maxMetricValue > 0) {
-            var magnitude = Math.pow(10, Math.floor(Math.log10(maxMetricValue)));
-            var normalized = maxMetricValue / magnitude;
-            var niceNormalized = 10;
-
-            if (normalized <= 1) {
-                niceNormalized = 1;
-            } else if (normalized <= 2) {
-                niceNormalized = 2;
-            } else if (normalized <= 5) {
-                niceNormalized = 5;
-            }
-
-            scaleMax = Math.max(1, niceNormalized * magnitude);
-        }
-
-        if (dashboardAnalyticsScaleLabels.length >= 5) {
-            var formatScaleTick = function (value) {
-                var normalizedValue = Math.round(Number(value || 0) * 10) / 10;
-                if (Math.abs(normalizedValue - Math.round(normalizedValue)) < 0.001) {
-                    return String(Math.round(normalizedValue));
-                }
-                return normalizedValue.toFixed(1);
-            };
-
-            var scaleValues = [scaleMax, scaleMax * 0.75, scaleMax * 0.5, scaleMax * 0.25, 0];
-            dashboardAnalyticsScaleLabels.each(function (index) {
-                if (index < scaleValues.length) {
-                    $(this).text(formatScaleTick(scaleValues[index]));
-                }
-            });
-        }
-
-        if (dashboardAnalyticsBars.length) {
-            var barsHtml = analyticsItems.map(function (item) {
-                var barRatio = scaleMax > 0 ? Number(item && item.value) / scaleMax : 0;
-                if (!Number.isFinite(barRatio) || barRatio < 0) {
-                    barRatio = 0;
-                }
-                if (barRatio > 1) {
-                    barRatio = 1;
-                }
-
-                var heightPct = item.value > 0 ? Math.max(20, Math.round(barRatio * 100)) : 12;
-                var levelPct = barRatio * 100;
-                var levelPctText = levelPct.toFixed(1).replace(/\.0$/, "");
-
-                return (
-                    '<div class="analytics-bar-col analytics-bar-col-metric" title="' + escapeHtml(item.fullLabel) + ": " + String(item.value) + " (" + levelPctText + '%)">' +
-                        '<span class="analytics-value">' + String(item.value) + "</span>" +
-                        '<span class="analytics-bar ' + item.className + '" style="--h: ' + String(heightPct) + '%"></span>' +
-                        "<small>" + escapeHtml(item.shortLabel) + "</small>" +
-                        '<span class="analytics-percent">' + levelPctText + '%</span>' +
-                    "</div>"
-                );
-            }).join("");
-
-            dashboardAnalyticsBars.html(barsHtml);
-        }
-
-        if (dashboardAnalyticsStats.length) {
-            var statsHtml = analyticsItems.map(function (item) {
-                var ratio = Number(item && item.ratio);
-                if (!Number.isFinite(ratio) || ratio < 0) {
-                    ratio = 0;
-                }
-                if (ratio > 1) {
-                    ratio = 1;
-                }
-
-                var pctText = (ratio * 100).toFixed(1).replace(/\.0$/, "");
-
-                return (
-                    '<div class="analytics-stat-row">' +
-                        '<span class="analytics-stat-label"><i class="analytics-stat-dot ' +
-                            item.className +
-                            '"></i>' +
-                            escapeHtml(item.shortLabel) +
-                        "</span>" +
-                        '<strong class="analytics-stat-value">' + pctText + "%</strong>" +
-                    "</div>"
-                );
-            }).join("");
-
-            dashboardAnalyticsStats.html(statsHtml);
-        }
-
-        dashboardTotalProjects.text(String(total));
-        dashboardEndedProjects.text(String(sliderRecords));
-        dashboardPhotoFolders.text(String(photoFolders));
-        dashboardVideoFolders.text(String(videoFolders));
-        dashboardEnquiryQueue.text(String(enquiryQueue));
-        dashboardNewsCount.text(String(newsRecords));
-
-        var progressTotal = sliderRecords + running + enquiryQueue;
-        var doneRatio = progressTotal > 0 ? sliderRecords / progressTotal : 0;
-        var activeRatio = progressTotal > 0 ? running / progressTotal : 0;
-        var pendingRatio = progressTotal > 0 ? enquiryQueue / progressTotal : 0;
-        var donePct = doneRatio * 100;
-        var activePct = activeRatio * 100;
-        var pendingPct = progressTotal > 0 ? Math.max(0, 100 - donePct - activePct) : 100;
-        var overallPct = Math.round((doneRatio * 1 + activeRatio * 0.6 + pendingRatio * 0.15) * 100);
-
-        if (dashboardProgressRing.length) {
-            dashboardProgressRing.css("--done", donePct.toFixed(2));
-            dashboardProgressRing.css("--active", activePct.toFixed(2));
-            dashboardProgressRing.css("--pending", pendingPct.toFixed(2));
-            dashboardProgressRing.attr(
-                "aria-label",
-                "Project progress " +
-                String(overallPct) +
-                "%, Slider " +
-                String(sliderRecords) +
-                ", Folders " +
-                String(running) +
-                ", Enquiries " +
-                String(enquiryQueue)
+        var statsHtml = items.map(function (item) {
+            var ratio = total > 0 ? item.value / total : 0;
+            var pctText = (ratio * 100).toFixed(1).replace(/\.0$/, "");
+            return (
+                '<div class="analytics-stat-row">' +
+                    '<span class="analytics-stat-label"><i class="analytics-stat-dot ' +
+                        item.className +
+                        '"></i>' +
+                        escapeHtml(item.label) +
+                    "</span>" +
+                    '<strong class="analytics-stat-value">' + pctText + "%</strong>" +
+                "</div>"
             );
+        }).join("");
+
+        dashboardAnalyticsStats.html(statsHtml);
+    };
+
+    var renderDashboardMetrics = function (previousData) {
+        var current = normalizeAnalyticsPayload(dashboardMetrics);
+        var previous = normalizeAnalyticsPayload(previousData || current);
+        var items = buildAnalyticsItems(current);
+        var total = items.reduce(function (sum, item) {
+            return sum + (Number(item.value) || 0);
+        }, 0);
+
+        if (dashboardTotalProjects.length) {
+            dashboardTotalProjects.text(String(total));
         }
-        if (dashboardProjectProgressPercent.length) {
-            dashboardProjectProgressPercent.text(String(overallPct) + "%");
+
+        dashboardEndedProjects.text(String(current.slider));
+        dashboardPhotoFolders.text(String(current.imageFolders));
+        dashboardVideoFolders.text(String(current.videoFolders));
+        dashboardEnquiryQueue.text(String(current.enquiries));
+        dashboardNewsCount.text(String(current.news));
+
+        updateMetricDelta(dashboardSliderDelta, current.slider - previous.slider);
+        if (dashboardPhotoCount.length) {
+            dashboardPhotoCount.text("Total images: " + String(current.imageFiles));
         }
-        if (dashboardProjectProgressLabel.length) {
-            dashboardProjectProgressLabel.text(progressTotal > 0 ? "Overall project completion" : "No project data yet");
+        if (dashboardVideoCount.length) {
+            dashboardVideoCount.text("Total videos: " + String(current.videoFiles));
         }
-        if (dashboardProgressDoneCount.length) {
-            dashboardProgressDoneCount.text(String(sliderRecords));
-        }
-        if (dashboardProgressActiveCount.length) {
-            dashboardProgressActiveCount.text(String(running));
-        }
-        if (dashboardProgressPendingCount.length) {
-            dashboardProgressPendingCount.text(String(enquiryQueue));
-        }
+        updateMetricDelta(dashboardPhotoDelta, current.imageFiles - previous.imageFiles);
+        updateMetricDelta(dashboardVideoDelta, current.videoFiles - previous.videoFiles);
+        updateMetricDelta(dashboardEnquiriesDelta, current.enquiries - previous.enquiries);
+        updateMetricDelta(dashboardNewsDelta, current.news - previous.news);
+
+        updateAnalyticsChart(items);
+        updateAnalyticsStats(items);
     };
 
     var resetDashboardMetrics = function () {
         dashboardMetrics = {
-            banners: 0,
+            videos: 0,
+            images: 0,
+            slider: 0,
+            news: 0,
             enquiries: 0,
             imageFolders: 0,
+            imageFiles: 0,
             videoFolders: 0,
-            newsItems: 0,
+            videoFiles: 0,
         };
-        renderDashboardMetrics();
+        lastAnalyticsSnapshot = null;
+        renderDashboardMetrics(dashboardMetrics);
+    };
+
+    var fetchAnalyticsData = function () {
+        var headers = {};
+        if (tokenValid()) {
+            headers = getAuthHeaders();
+        }
+
+        return fetch("/analytics", { method: "GET", headers: headers, cache: "no-store" })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Analytics request failed.");
+                }
+                return response.json();
+            })
+            .then(function (payload) {
+                return normalizeAnalyticsPayload(payload);
+            });
     };
 
     var loadDashboardMetrics = function () {
-        resetDashboardMetrics();
         if (!tokenValid()) {
+            resetDashboardMetrics();
             return;
         }
 
-        $.ajax({
-            url: "/admin/carousel",
-            method: "GET",
-            headers: getAuthHeaders(),
-            success: function (response) {
-                dashboardMetrics.banners = Array.isArray(response && response.banners) ? response.banners.length : 0;
-                renderDashboardMetrics();
-            },
-            error: function (xhr) {
-                handleAuthError(xhr);
-            },
-        });
+        if (!dashboardAnalyticsChart) {
+            ensureAnalyticsChart(generateRandomAnalytics());
+        }
 
-        $.ajax({
-            url: "/admin/enquiries",
-            method: "GET",
-            headers: getAuthHeaders(),
-            success: function (response) {
-                dashboardMetrics.enquiries = Array.isArray(response && response.enquiries) ? response.enquiries.length : 0;
-                renderDashboardMetrics();
-            },
-            error: function (xhr) {
-                handleAuthError(xhr);
-            },
-        });
+        fetchAnalyticsData()
+            .then(function (payload) {
+                var previous = lastAnalyticsSnapshot;
+                dashboardMetrics = normalizeAnalyticsPayload(payload);
+                renderDashboardMetrics(previous);
+                lastAnalyticsSnapshot = dashboardMetrics;
+            })
+            .catch(function () {
+                if (!lastAnalyticsSnapshot) {
+                    dashboardMetrics = normalizeAnalyticsPayload(generateRandomAnalytics());
+                    renderDashboardMetrics();
+                    lastAnalyticsSnapshot = dashboardMetrics;
+                }
+            });
+    };
 
-        $.ajax({
-            url: "/admin/gallery-folder-cards",
-            method: "GET",
-            headers: getAuthHeaders(),
-            success: function (response) {
-                dashboardMetrics.imageFolders = Array.isArray(response && response.folders) ? response.folders.length : 0;
-                renderDashboardMetrics();
-            },
-            error: function (xhr) {
-                handleAuthError(xhr);
-            },
-        });
+    var startAnalyticsAutoRefresh = function () {
+        if (analyticsRefreshTimer) {
+            window.clearInterval(analyticsRefreshTimer);
+        }
+        loadDashboardMetrics();
+        analyticsRefreshTimer = window.setInterval(function () {
+            if (currentView === "dashboard") {
+                loadDashboardMetrics();
+            }
+        }, 5000);
+    };
 
-        $.ajax({
-            url: "/admin/video-folder-cards",
-            method: "GET",
-            headers: getAuthHeaders(),
-            success: function (response) {
-                dashboardMetrics.videoFolders = Array.isArray(response && response.folders) ? response.folders.length : 0;
-                renderDashboardMetrics();
-            },
-            error: function (xhr) {
-                handleAuthError(xhr);
-            },
-        });
-
-        $.ajax({
-            url: "/admin/news-items",
-            method: "GET",
-            headers: getAuthHeaders(),
-            success: function (response) {
-                dashboardMetrics.newsItems = Array.isArray(response && response.items) ? response.items.length : 0;
-                renderDashboardMetrics();
-            },
-            error: function (xhr) {
-                handleAuthError(xhr);
-            },
-        });
+    var stopAnalyticsAutoRefresh = function () {
+        if (analyticsRefreshTimer) {
+            window.clearInterval(analyticsRefreshTimer);
+            analyticsRefreshTimer = null;
+        }
     };
 
     var startDashboardClock = function () {
@@ -1745,21 +1875,30 @@ $(function () {
         imagesSection.toggleClass("d-none", normalized !== "images");
         videosSection.toggleClass("d-none", normalized !== "videos");
 
+        if (normalized === "dashboard") {
+            hideAlert();
+        }
+
         if (syncUrl) {
             updateViewQuery(normalized);
         }
 
         if (normalized === "dashboard") {
-            loadDashboardMetrics();
+            startAnalyticsAutoRefresh();
         } else if (normalized === "enquiries") {
+            stopAnalyticsAutoRefresh();
             loadEnquiries();
         } else if (normalized === "news") {
+            stopAnalyticsAutoRefresh();
             loadNewsItems();
         } else if (normalized === "images") {
+            stopAnalyticsAutoRefresh();
             loadGalleryFolderCards(currentGalleryFolder);
         } else if (normalized === "videos") {
+            stopAnalyticsAutoRefresh();
             loadVideoFolderCards(currentVideoFolder);
         } else {
+            stopAnalyticsAutoRefresh();
             loadBanners();
         }
     };
@@ -1780,7 +1919,9 @@ $(function () {
     runAdminBootAnimation();
     startDashboardClock();
     refreshAdminIdentity();
-    ensureAuth();
+    if (!ensureAuth()) {
+        return;
+    }
     setView(getInitialView(), false);
     closeSidebarMenu();
 
@@ -1792,6 +1933,7 @@ $(function () {
         if (!isMobileSidebar()) {
             closeSidebarMenu();
         }
+        window.requestAnimationFrame(renderAnalyticsTrendLine);
     });
 
     $(document).on("keydown", function (event) {
@@ -1848,8 +1990,8 @@ $(function () {
         $(resetModalEl).on("hidden.bs.modal", function () {
             resetError.removeClass("is-visible");
             resetHint.text("");
-            if (!tokenValid() && loginModal) {
-                loginModal.show();
+            if (!tokenValid()) {
+                redirectToLogin();
             }
         });
     }
@@ -2257,6 +2399,12 @@ $(function () {
             showAlert("Enter a valid folder name.", "danger");
             return;
         }
+        if (currentGalleryFolderOrder.some(function (name) {
+            return folderKey(name) === folderKey(folderName);
+        })) {
+            showAlert("Folder already exists.", "danger");
+            return;
+        }
 
         createGalleryFolderBtn.prop("disabled", true);
 
@@ -2349,6 +2497,12 @@ $(function () {
         var folderName = normalizeFolderName(rawName);
         if (!folderName) {
             showAlert("Enter a valid folder name.", "danger");
+            return;
+        }
+        if (currentVideoFolderOrder.some(function (name) {
+            return folderKey(name) === folderKey(folderName);
+        })) {
+            showAlert("Video folder already exists.", "danger");
             return;
         }
 
@@ -2617,8 +2771,8 @@ $(function () {
                 paused: nextPaused,
             }),
             success: function (response) {
-                setNewsPauseState(Boolean(response && response.paused));
-                showAlert(response.message || "News scroll state updated.", "success");
+                var paused = Boolean(response && response.paused);
+                setNewsPauseState(paused);
             },
             error: function (xhr) {
                 if (handleAuthError(xhr)) {
@@ -2763,6 +2917,62 @@ $(function () {
                 showAlert(msg, "danger");
                 setFormBusy(false);
             });
+    });
+
+    newsListWrap.on("click", ".btn-news-sequence", function () {
+        if (!ensureAuth()) {
+            return;
+        }
+
+        var button = $(this);
+        var card = button.closest(".news-item-card");
+        var newsId = Number(button.data("newsId") || card.data("newsId"));
+        var sequence = Number(card.find(".news-sequence-select").val());
+
+        if (!Number.isInteger(newsId) || newsId <= 0) {
+            showAlert("Invalid news id.", "danger");
+            return;
+        }
+        if (!Number.isInteger(sequence) || sequence < 1) {
+            showAlert("Please select a valid sequence number.", "danger");
+            return;
+        }
+
+        button.prop("disabled", true);
+
+        $.ajax({
+            url: "/admin/news-items/reorder",
+            method: "POST",
+            headers: getAuthHeaders(),
+            contentType: "application/json",
+            data: JSON.stringify({
+                id: newsId,
+                sequence: sequence,
+            }),
+            success: function (response) {
+                showAlert(response.message || "News sequence updated successfully.", "success");
+                if (response && Array.isArray(response.items)) {
+                    renderNewsItems(response.items);
+                } else {
+                    loadNewsItems();
+                }
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) {
+                    button.prop("disabled", false);
+                    return;
+                }
+                var msg = "Unable to update news sequence.";
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+                showAlert(msg, "danger");
+                button.prop("disabled", false);
+            },
+            complete: function () {
+                button.prop("disabled", false);
+            },
+        });
     });
 
     newsListWrap.on("click", ".btn-news-edit", function () {
@@ -3023,8 +3233,6 @@ $(function () {
         renderVideoFileEmptyState("Login required to manage video folder.");
         resetDashboardMetrics();
         showAlert("Logged out successfully.", "success");
-        if (loginModal) {
-            loginModal.show();
-        }
+        redirectToLogin();
     });
 });

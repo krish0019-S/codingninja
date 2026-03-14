@@ -164,8 +164,20 @@ var deleteEnquiry = async function (id) {
     return Number(meta.affectedRows || 0) > 0;
 };
 
+var countEnquiries = async function () {
+    await ensureEnquiriesTable();
+    var result = await db.query("SELECT COUNT(*) AS total FROM enquiries");
+    var rows = result[0] || [];
+    var total = rows.length ? Number(rows[0].total || 0) : 0;
+    if (!Number.isFinite(total) || total < 0) {
+        return 0;
+    }
+    return total;
+};
+
 module.exports = {
     createEnquiry: createEnquiry,
+    countEnquiries: countEnquiries,
     deleteEnquiry: deleteEnquiry,
     ensureEnquiriesTable: ensureEnquiriesTable,
     isExampleEmail: isExampleEmail,

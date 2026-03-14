@@ -111,6 +111,7 @@ var normalizeItem = function (item) {
 
     var title = toText(item && item.title);
     var content = toText(item && item.content);
+    var sequence = Number(item && item.sequence);
     var contentLink = normalizeOptionalUrl(item && item.contentLink, {
         fieldName: "Content link",
         maxLength: MAX_CONTENT_LINK_LENGTH,
@@ -131,6 +132,7 @@ var normalizeItem = function (item) {
         imageUrl: imageUrl,
         createdAt: toText(item && item.createdAt) || nowIso(),
         updatedAt: toText(item && item.updatedAt) || nowIso(),
+        sequence: Number.isInteger(sequence) && sequence > 0 ? sequence : 0,
     };
 };
 
@@ -139,12 +141,46 @@ var normalizeList = function (items) {
         return [];
     }
 
-    return items
+    var normalized = items
         .map(normalizeItem)
-        .filter(Boolean)
-        .sort(function (a, b) {
-            return a.id - b.id;
+        .filter(Boolean);
+
+    if (!normalized.length) {
+        return [];
+    }
+
+    var hasSequence = normalized.some(function (item) {
+        return Number.isInteger(item.sequence) && item.sequence > 0;
+    });
+
+    if (!hasSequence) {
+        normalized.sort(function (a, b) {
+            return b.id - a.id;
         });
+        normalized.forEach(function (item, index) {
+            item.sequence = index + 1;
+        });
+        return normalized;
+    }
+
+    normalized.forEach(function (item) {
+        if (!Number.isInteger(item.sequence) || item.sequence < 1) {
+            item.sequence = Number.MAX_SAFE_INTEGER;
+        }
+    });
+
+    normalized.sort(function (a, b) {
+        if (a.sequence === b.sequence) {
+            return b.id - a.id;
+        }
+        return a.sequence - b.sequence;
+    });
+
+    normalized.forEach(function (item, index) {
+        item.sequence = index + 1;
+    });
+
+    return normalized;
 };
 
 var defaultStore = function () {
@@ -152,7 +188,7 @@ var defaultStore = function () {
     return {
         version: 1,
         paused: false,
-        items: DEFAULT_ITEMS.map(function (item) {
+        items: DEFAULT_ITEMS.map(function (item, index) {
             return {
                 id: item.id,
                 title: item.title,
@@ -161,6 +197,7 @@ var defaultStore = function () {
                 imageUrl: "",
                 createdAt: stamp,
                 updatedAt: stamp,
+                sequence: index + 1,
             };
         }),
     };
@@ -256,7 +293,7 @@ var getNewsState = async function () {
     return {
         paused: normalizePaused(store && store.paused),
         items: store.items.slice().sort(function (a, b) {
-            return b.id - a.id;
+            return a.sequence - b.sequence;
         }),
     };
 };
@@ -282,6 +319,7 @@ var createNewsItem = async function (payload) {
             imageUrl: cleaned.imageUrl,
             createdAt: stamp,
             updatedAt: stamp,
+            sequence: 1,
         };
         store.items.push(item);
         await writeStore(store);
@@ -315,6 +353,7 @@ var updateNewsItem = async function (id, payload) {
             imageUrl: cleaned.imageUrl,
             createdAt: current.createdAt || nowIso(),
             updatedAt: nowIso(),
+            sequence: current.sequence || 0,
         };
         store.items[index] = updated;
         await writeStore(store);
@@ -344,6 +383,45 @@ var deleteNewsItem = async function (id) {
     });
 };
 
+var reorderNewsSequence = async function (id, targetSequence) {
+    var newsId = Number(id);
+    var sequence = Number(targetSequence);
+    if (!Number.isInteger(newsId) || newsId <= 0) {
+        var idError = new Error("Invalid news id.");
+        idError.statusCode = 400;
+        throw idError;
+    }
+    if (!Number.isInteger(sequence) || sequence < 1) {
+        var seqError = new Error("Invalid sequence.");
+        seqError.statusCode = 400;
+        throw seqError;
+    }
+
+    return enqueueWrite(async function () {
+        var store = await readStore();
+        var items = store.items.slice();
+        var currentIndex = items.findIndex(function (item) {
+            return item.id === newsId;
+        });
+        if (currentIndex < 0) {
+            return null;
+        }
+        if (sequence > items.length) {
+            var rangeError = new Error("Invalid sequence.");
+            rangeError.statusCode = 400;
+            throw rangeError;
+        }
+        var moving = items.splice(currentIndex, 1)[0];
+        items.splice(sequence - 1, 0, moving);
+        items.forEach(function (item, index) {
+            item.sequence = index + 1;
+        });
+        store.items = items;
+        await writeStore(store);
+        return store.items.slice();
+    });
+};
+
 var isNewsPaused = async function () {
     var state = await getNewsState();
     return state.paused;
@@ -365,6 +443,7 @@ module.exports = {
     getNewsState: getNewsState,
     isNewsPaused: isNewsPaused,
     listNewsItems: listNewsItems,
+    reorderNewsSequence: reorderNewsSequence,
     setNewsPaused: setNewsPaused,
     updateNewsItem: updateNewsItem,
 };

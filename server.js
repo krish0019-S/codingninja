@@ -6,11 +6,17 @@ var adminRoutes = require("./routes/adminRoutes");
 var db = require("./config/db");
 var carouselBanners = require("./utils/carouselBanners");
 var enquiries = require("./utils/enquiries");
+var newsItems = require("./utils/newsItems");
 
 
 
 var app = express();
 var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+var GALLERY_FOLDER_REGEX = /^[a-z0-9][a-z0-9_-]{0,39}$/i;
+var IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png"]);
+var VIDEO_EXTS = new Set([".mp4", ".webm", ".ogg", ".mov", ".m4v"]);
+var GALLERY_IMAGE_ROOT_DIR = path.join(__dirname, "Public", "images", "gallery");
+var GALLERY_VIDEO_ROOT_DIR = path.join(__dirname, "Public", "videos", "gallery");
 
 
 var getRequestBody = function (req) {
@@ -89,10 +95,112 @@ var validateRobotCheck = function (req) {
     return { ok: true };
 };
 
+var listGalleryFolders = async function (rootDir) {
+    try {
+        await fs.promises.mkdir(rootDir, { recursive: true });
+        var entries = await fs.promises.readdir(rootDir, { withFileTypes: true });
+        return entries
+            .filter(function (entry) {
+                return entry.isDirectory() && GALLERY_FOLDER_REGEX.test(entry.name);
+            })
+            .map(function (entry) {
+                return entry.name;
+            });
+    } catch (error) {
+        return [];
+    }
+};
+
+var countFilesInFolder = async function (folderDir, allowedExts) {
+    try {
+        var entries = await fs.promises.readdir(folderDir, { withFileTypes: true });
+        return entries.filter(function (entry) {
+            if (!entry.isFile()) {
+                return false;
+            }
+            var ext = path.extname(entry.name).toLowerCase();
+            return allowedExts.has(ext);
+        }).length;
+    } catch (error) {
+        return 0;
+    }
+};
+
+var countGalleryStats = async function (rootDir, allowedExts) {
+    var folders = await listGalleryFolders(rootDir);
+    var counts = await Promise.all(
+        folders.map(function (name) {
+            return countFilesInFolder(path.join(rootDir, name), allowedExts);
+        })
+    );
+
+    var fileCount = counts.reduce(function (sum, value) {
+        return sum + (Number(value) || 0);
+    }, 0);
+
+    return {
+        folderCount: folders.length,
+        fileCount: fileCount,
+    };
+};
+
 app.use(express.static("Public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/admin", adminRoutes);
+
+app.get("/analytics", async function (req, res) {
+    try {
+        var results = await Promise.all([
+            carouselBanners.listCarouselBanners().catch(function () {
+                return [];
+            }),
+            newsItems.listNewsItems().catch(function () {
+                return [];
+            }),
+            countGalleryStats(GALLERY_IMAGE_ROOT_DIR, IMAGE_EXTS).catch(function () {
+                return { folderCount: 0, fileCount: 0 };
+            }),
+            countGalleryStats(GALLERY_VIDEO_ROOT_DIR, VIDEO_EXTS).catch(function () {
+                return { folderCount: 0, fileCount: 0 };
+            }),
+            enquiries.countEnquiries().catch(function () {
+                return 0;
+            }),
+        ]);
+
+        var banners = Array.isArray(results[0]) ? results[0] : [];
+        var newsList = Array.isArray(results[1]) ? results[1] : [];
+        var imageStats = results[2] || { folderCount: 0, fileCount: 0 };
+        var videoStats = results[3] || { folderCount: 0, fileCount: 0 };
+        var enquiryCount = Number(results[4]) || 0;
+
+        return res.json({
+            videos: Math.max(0, Number(videoStats.fileCount) || 0),
+            images: Math.max(0, Number(imageStats.fileCount) || 0),
+            slider: Math.max(0, banners.length),
+            news: Math.max(0, newsList.length),
+            enquiries: Math.max(0, enquiryCount),
+            imageFolders: Math.max(0, Number(imageStats.folderCount) || 0),
+            videoFolders: Math.max(0, Number(videoStats.folderCount) || 0),
+            imageFiles: Math.max(0, Number(imageStats.fileCount) || 0),
+            videoFiles: Math.max(0, Number(videoStats.fileCount) || 0),
+        });
+    } catch (error) {
+        console.error("Analytics count failed:", error);
+        return res.json({
+            videos: 0,
+            images: 0,
+            slider: 0,
+            news: 0,
+            enquiries: 0,
+            imageFolders: 0,
+            videoFolders: 0,
+            imageFiles: 0,
+            videoFiles: 0,
+        });
+    }
+});
 
 app.get("/uploads/:bannerName", async function (req, res) {
     var bannerName = String(req.params.bannerName || "");
