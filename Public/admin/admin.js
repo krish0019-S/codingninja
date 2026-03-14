@@ -1706,7 +1706,7 @@ $(function () {
 
         updateMetricDelta(dashboardSliderDelta, current.slider - previous.slider);
         if (dashboardPhotoCount.length) {
-            dashboardPhotoCount.text("Total images: " + String(current.imageFiles));
+            dashboardPhotoCount.text("Total photos: " + String(current.imageFiles));
         }
         if (dashboardVideoCount.length) {
             dashboardVideoCount.text("Total videos: " + String(current.videoFiles));
