@@ -244,6 +244,25 @@ a[role="button"],
     border-radius: 999px
 }
 
+.nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 998;
+}
+
+.nav-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+body.nav-open {
+    overflow: hidden;
+}
+
 .brand-logo {
     height: 56px;
     width: auto;
@@ -2881,13 +2900,43 @@ body.enquiry-open {
     }
 
     .nav-links {
-        width: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: min(82vw, 320px);
+        height: 100vh;
+        padding: 90px 20px 24px;
         flex-direction: column;
         align-items: flex-start;
         gap: 14px;
         font-size: .95rem;
         justify-content: flex-start;
-        display: none
+        background: #fff;
+        box-shadow: 12px 0 24px rgba(15, 23, 42, 0.18);
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 999;
+        display: flex;
+        overflow-y: auto;
+        overscroll-behavior: contain
+    }
+
+    .nav-links,
+    .nav-links .nav-dropdown,
+    .nav-links .nav-gallery-toggle {
+        text-align: left;
+        justify-content: flex-start;
+        align-items: flex-start
+    }
+
+    .nav-links > a,
+    .nav-links > .nav-dropdown {
+        width: 100%
+    }
+
+    .nav-links > a {
+        text-align: left;
+        padding: 6px 0
     }
 
     .nav-links a::before {
@@ -2936,24 +2985,35 @@ body.enquiry-open {
     }
 
     .nav-links.is-open {
-        display: flex;
+        transform: translateX(0);
         order: 3
     }
 
     .nav-dropdown {
         width: 100%;
+        display: flex;
+        align-self: stretch;
         flex-direction: column;
         align-items: flex-start
     }
 
     .nav-gallery-toggle {
-        width: 100%
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        text-align: left
+    }
+
+    .nav-gallery-toggle::after {
+        margin-left: auto
     }
 
     .nav-dropdown-menu {
         position: static;
         min-width: 100%;
         width: 100%;
+        text-align: left;
         box-shadow: none;
         border-radius: 10px;
         border: 1px solid #e5e7eb;

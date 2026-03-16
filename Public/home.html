@@ -83,19 +83,19 @@
                     </div>
                     <div class="mobile-actions">
                         <div class="social-icons">
-                            <a class="social-btn fb" href="#" aria-label="Facebook">
+                            <a class="social-btn fb" href="https://www.facebook.com/rudrakshcreation/about" aria-label="Facebook" target="_blank" rel="noopener">
                                 <svg viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                                 </svg>
                             </a>
-                            <a class="social-btn ig" href="#" aria-label="Instagram">
+                            <a class="social-btn ig" href="https://www.instagram.com/rudrakshcreationbti/" aria-label="Instagram" target="_blank" rel="noopener">
                                 <svg viewBox="0 0 24 24" aria-hidden="true">
                                     <rect x="2" y="2" width="20" height="20" rx="5"></rect>
                                     <circle cx="12" cy="12" r="4"></circle>
                                     <circle cx="17.5" cy="6.5" r="1"></circle>
                                 </svg>
                             </a>
-                            <a class="social-btn yt" href="#" aria-label="YouTube">
+                            <a class="social-btn yt" href="https://www.youtube.com/@rudrakshcreation" aria-label="YouTube" target="_blank" rel="noopener">
                                 <svg viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M22 8.5a4 4 0 0 0-2.8-2.8C17.3 5 12 5 12 5s-5.3 0-7.2.7A4 4 0 0 0 2 8.5 41 41 0 0 0 2 12a41 41 0 0 0 .8 3.5 4 4 0 0 0 2.8 2.8C6.7 19 12 19 12 19s5.3 0 7.2-.7a4 4 0 0 0 2.8-2.8A41 41 0 0 0 22 12a41 41 0 0 0 0-3.5z"></path>
                                     <path d="M10 9l6 3-6 3z"></path>
@@ -149,6 +149,7 @@
                     </button>
                 </div>
             </div>
+            <div class="nav-overlay" id="navOverlay" aria-hidden="true"></div>
         </nav>
     </header>
 
@@ -1353,6 +1354,7 @@
 
         var navToggle = document.querySelector(".nav-toggle");
         var navLinks = document.querySelector(".nav-links");
+        var navOverlay = document.querySelector(".nav-overlay");
         var navDropdowns = document.querySelectorAll("[data-nav-dropdown]");
 
         var closeNavDropdowns = function () {
@@ -1386,22 +1388,77 @@
             }
         });
 
+        var setNavOpen = function (state) {
+            if (!navLinks || !navToggle) {
+                return;
+            }
+            var shouldOpen = Boolean(state);
+            navLinks.classList.toggle("is-open", shouldOpen);
+            navToggle.setAttribute("aria-expanded", String(shouldOpen));
+            document.body.classList.toggle("nav-open", shouldOpen);
+            if (navOverlay) {
+                navOverlay.classList.toggle("is-open", shouldOpen);
+            }
+            if (!shouldOpen) {
+                closeNavDropdowns();
+            }
+            updateNavOffset();
+        };
+
         if (navToggle && navLinks) {
             navToggle.addEventListener("click", () => {
-                var isOpen = navLinks.classList.toggle("is-open");
-                navToggle.setAttribute("aria-expanded", String(isOpen));
-                if (!isOpen) {
-                    closeNavDropdowns();
-                }
-                updateNavOffset();
+                var isOpen = navLinks.classList.contains("is-open");
+                setNavOpen(!isOpen);
             });
 
             navLinks.addEventListener("click", (event) => {
                 if (event.target.tagName === "A" && !event.target.classList.contains("nav-gallery-toggle")) {
-                    closeNavDropdowns();
-                    navLinks.classList.remove("is-open");
-                    navToggle.setAttribute("aria-expanded", "false");
+                    setNavOpen(false);
                 }
+            });
+        }
+
+        if (navOverlay) {
+            navOverlay.addEventListener("click", function () {
+                setNavOpen(false);
+            });
+        }
+
+        var mobileOrderBtn = document.querySelector(".mobile-order");
+        if (mobileOrderBtn) {
+            mobileOrderBtn.addEventListener("click", function (event) {
+                var targetUrl = mobileOrderBtn.getAttribute("href");
+                if (!targetUrl) {
+                    return;
+                }
+                event.preventDefault();
+                var popup = window.open(targetUrl, "_blank", "noopener");
+                if (!popup) {
+                    window.location.href = targetUrl;
+                }
+                setNavOpen(false);
+            });
+        }
+
+        var mobileSocialLinks = document.querySelectorAll(".mobile-actions .social-btn");
+        if (mobileSocialLinks && mobileSocialLinks.length) {
+            mobileSocialLinks.forEach(function (link) {
+                link.addEventListener("click", function (event) {
+                    var targetUrl = link.getAttribute("href");
+                    if (!targetUrl) {
+                        return;
+                    }
+                    event.preventDefault();
+                    if (targetUrl.indexOf("mailto:") === 0) {
+                        window.location.href = targetUrl;
+                    } else {
+                        var popup = window.open(targetUrl, "_blank", "noopener");
+                        if (!popup) {
+                            window.location.href = targetUrl;
+                        }
+                    }
+                    setNavOpen(false);
+                });
             });
         }
 
