@@ -646,17 +646,30 @@ var buildVideoFolderCards = async function (onlyWithVideos) {
     return filtered;
 };
 
-const transporter = nodemailer.createTransport({
-   service: 'gmail',
-   auth: {
-      user: 'krishtanwar153@gmail.com',
-      pass: 'ukua hfny wbxy orsr'
-   }
-});
+var smtpHost = process.env.SMTP_HOST || "";
+var smtpPort = Number(process.env.SMTP_PORT || 587);
+var smtpSecure = String(process.env.SMTP_SECURE || "").toLowerCase() === "true";
+if (!process.env.SMTP_SECURE && smtpPort === 465) {
+    smtpSecure = true;
+}
+var smtpUser = process.env.SMTP_USER || "krishtanwar153@gmail.com";
+var smtpPass = process.env.SMTP_PASS || "ukua hfny wbxy orsr";
+smtpPass = String(smtpPass || "").replace(/\s+/g, "");
+
+var transporterConfig = smtpHost
+    ? { host: smtpHost, port: smtpPort, secure: smtpSecure }
+    : { service: "gmail" };
+
+var transporter = nodemailer.createTransport(
+    Object.assign({}, transporterConfig, {
+        auth: smtpUser ? { user: smtpUser, pass: smtpPass } : undefined,
+    })
+);
+var fromEmail = process.env.FROM_EMAIL || smtpUser;
 
 function sendVerificationEmail(email, verificationCode) {
    const mailOptions = {
-      from: transporter.options.auth.user,
+      from: fromEmail || (transporter.options.auth && transporter.options.auth.user),
       to: email,
       subject: 'Rudraksh Creation - Admin Reset Code',
       html: `

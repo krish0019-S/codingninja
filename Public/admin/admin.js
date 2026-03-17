@@ -2034,9 +2034,19 @@ $(function () {
     });
 
     $("#sendResetCode").on("click", function () {
+        var sendButton = $(this);
+        if (sendButton.prop("disabled")) {
+            return;
+        }
+        var defaultLabel = sendButton.data("defaultLabel");
+        if (!defaultLabel) {
+            defaultLabel = sendButton.text();
+            sendButton.data("defaultLabel", defaultLabel);
+        }
         var email = $("#adminResetForm").find("input[name='email']").val().trim();
         resetError.removeClass("is-visible");
-        resetHint.text("");
+        resetHint.text("Sending reset code...");
+        sendButton.prop("disabled", true).text("Sending...");
 
         $.ajax({
             url: "/admin/forgot-password",
@@ -2053,6 +2063,10 @@ $(function () {
                     msg = xhr.responseJSON.message;
                 }
                 resetError.text(msg).addClass("is-visible");
+                resetHint.text("");
+            },
+            complete: function () {
+                sendButton.prop("disabled", false).text(defaultLabel);
             },
         });
     });
