@@ -48,7 +48,8 @@ body {
 
 .page-loader.hidden {
     opacity: 0;
-    visibility: hidden
+    visibility: hidden;
+    pointer-events: none
 }
 
 .loader-inner {
@@ -314,6 +315,10 @@ body.nav-open {
 .nav-links a.active {
     color: var(--red);
     background-size: 100% 2px
+}
+
+.mobile-nav-brand {
+    display: none;
 }
 
 .nav-dropdown {
@@ -2246,6 +2251,14 @@ main {
     transition: opacity 0.25s ease, transform 0.25s ease
 }
 
+.chat-panel[hidden] {
+    display: none
+}
+
+.chat-panel[inert] {
+    pointer-events: none
+}
+
 .chat-widget.is-open .chat-panel {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -2390,6 +2403,16 @@ body.enquiry-open {
     opacity: 1;
     visibility: visible;
     backdrop-filter: blur(4px)
+}
+
+.enquiry-modal,
+.video-modal {
+    pointer-events: none
+}
+
+.enquiry-modal.is-open,
+.video-modal.is-open {
+    pointer-events: auto
 }
 
 .enquiry-modal-inner {
@@ -2918,7 +2941,27 @@ body.enquiry-open {
         z-index: 999;
         display: flex;
         overflow-y: auto;
-        overscroll-behavior: contain
+        overscroll-behavior: contain;
+        pointer-events: none
+    }
+
+    .mobile-nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding-bottom: 8px;
+        margin-bottom: 6px;
+        border-bottom: 1px solid #eceef2;
+        font-family: "Sora", sans-serif;
+        font-weight: 700;
+        color: #1f2937
+    }
+
+    .mobile-nav-brand img {
+        width: 36px;
+        height: 36px;
+        object-fit: contain
     }
 
     .nav-links,
@@ -2986,7 +3029,8 @@ body.enquiry-open {
 
     .nav-links.is-open {
         transform: translateX(0);
-        order: 3
+        order: 3;
+        pointer-events: auto
     }
 
     .nav-dropdown {

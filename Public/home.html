@@ -55,6 +55,10 @@
                     <span></span>
                 </button>
                 <div class="nav-links" id="primaryNav">
+                    <div class="mobile-nav-brand">
+                        <img src="images/1.png" alt="Rudraksh Creation">
+                        <span>Rudraksh Creation</span>
+                    </div>
                     <a class="active" href="/">Home</a>
                     <a href="/about">About</a>
                     <a href="services-details.html">Services</a>
@@ -697,7 +701,7 @@
             <span class="chat-toggle-icon" aria-hidden="true">?</span>
             Help
         </button> 
-        <div class="chat-panel" id="chatPanel" role="dialog" aria-modal="false" aria-hidden="true">
+        <div class="chat-panel" id="chatPanel" role="dialog" aria-modal="false" aria-hidden="true" hidden inert tabindex="-1">
             <div class="chat-header">
                 <div>
                     <p class="chat-title">Rudraksh Help Desk</p>
@@ -1201,28 +1205,59 @@
             var chatInput = chatWidget.querySelector("input[name=\"message\"]");
             var chatMessages = chatWidget.querySelector("#chatMessages");
             var chatOptions = chatWidget.querySelectorAll(".chat-option");
+            var lastChatFocus = null;
 
             var openChat = () => {
-                chatWidget.classList.add("is-open");
-                if (chatToggle) {
-                    chatToggle.setAttribute("aria-expanded", "true");
+                if (!chatPanel) {
+                    return;
                 }
-                if (chatPanel) {
-                    chatPanel.setAttribute("aria-hidden", "false");
-                }
-                if (chatInput) {
-                    chatInput.focus();
-                }
+                lastChatFocus = document.activeElement;
+                chatPanel.hidden = false;
+                chatPanel.removeAttribute("inert");
+                chatPanel.setAttribute("aria-hidden", "false");
+                requestAnimationFrame(() => {
+                    chatWidget.classList.add("is-open");
+                    if (chatToggle) {
+                        chatToggle.setAttribute("aria-expanded", "true");
+                    }
+                    if (chatInput) {
+                        chatInput.focus({ preventScroll: true });
+                    } else {
+                        chatPanel.focus({ preventScroll: true });
+                    }
+                });
             };
 
             var closeChat = () => {
+                if (!chatPanel) {
+                    return;
+                }
+                var activeElement = document.activeElement;
+                if (activeElement && chatPanel.contains(activeElement)) {
+                    if (chatToggle) {
+                        chatToggle.focus({ preventScroll: true });
+                    } else if (typeof activeElement.blur === "function") {
+                        activeElement.blur();
+                    }
+                } else if (lastChatFocus && typeof lastChatFocus.focus === "function") {
+                    lastChatFocus.focus({ preventScroll: true });
+                }
+
                 chatWidget.classList.remove("is-open");
                 if (chatToggle) {
                     chatToggle.setAttribute("aria-expanded", "false");
                 }
-                if (chatPanel) {
-                    chatPanel.setAttribute("aria-hidden", "true");
-                }
+                chatPanel.setAttribute("aria-hidden", "true");
+                chatPanel.setAttribute("inert", "");
+
+                var finalizeClose = () => {
+                    if (!chatWidget.classList.contains("is-open")) {
+                        chatPanel.hidden = true;
+                    }
+                };
+
+                chatPanel.addEventListener("transitionend", finalizeClose, { once: true });
+                setTimeout(finalizeClose, 320);
             };
 
             var appendMessage = (text, type) => {
