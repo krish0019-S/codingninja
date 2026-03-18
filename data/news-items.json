@@ -3,6 +3,16 @@
   "paused": false,
   "items": [
     {
+      "id": 5,
+      "title": "Bathinda❤",
+      "content": "haklhgajkdhg\nnkdng;lksf\nnlkfj;gldkf\ndnfkldkggkl;ls\nfdfnl;lf",
+      "contentLink": "",
+      "imageUrl": "/images/gallery/news/logo_no_bg-mmvurpii-34l2bk.png",
+      "createdAt": "2026-03-18T09:42:34.232Z",
+      "updatedAt": "2026-03-18T09:42:34.232Z",
+      "sequence": 1
+    },
+    {
       "id": 3,
       "title": "Hlo",
       "content": "Good MOrning",
@@ -10,17 +20,17 @@
       "imageUrl": "/images/gallery/news/20250304_144401-mm4p7v9v-3g3obw.jpg",
       "createdAt": "2026-02-26T07:14:17.202Z",
       "updatedAt": "2026-02-27T09:37:23.747Z",
-      "sequence": 1
+      "sequence": 2
     },
     {
       "id": 2,
       "title": "We are excited",
       "content": "New Product Launch . Stay tuned for more details!\n\nCreated: 19 Feb 2026, 12:18 pm | Updated: 19 Feb 2026, 12:18 pm",
       "contentLink": "",
-      "imageUrl": "",
+      "imageUrl": "/images/gallery/news/chatgpt-image-feb-14-2026-05_28_10-pm-mmvustli-mhj49q.png",
       "createdAt": "2026-02-20T07:31:21.892Z",
-      "updatedAt": "2026-02-20T07:31:21.892Z",
-      "sequence": 2
+      "updatedAt": "2026-03-18T09:43:26.187Z",
+      "sequence": 3
     },
     {
       "id": 1,
@@ -30,7 +40,7 @@
       "imageUrl": "/images/gallery/news/20250302_180017-mm4p6zai-8ho6jo.jpg",
       "createdAt": "2026-02-19T06:48:51.983Z",
       "updatedAt": "2026-02-27T09:36:42.299Z",
-      "sequence": 3
+      "sequence": 4
     },
     {
       "id": 4,
@@ -40,7 +50,7 @@
       "imageUrl": "/images/gallery/news/antibiotics-mmaaez6v-g9enj7.jpg",
       "createdAt": "2026-03-03T07:09:25.552Z",
       "updatedAt": "2026-03-03T07:29:38.240Z",
-      "sequence": 4
+      "sequence": 5
     }
   ]
 }

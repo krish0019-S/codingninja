@@ -598,7 +598,7 @@ $(function () {
     };
 
     var ensureNewsGalleryFolder = function () {
-        return $.ajax({
+        var request = $.ajax({
             url: "/admin/gallery-folders",
             method: "POST",
             headers: getAuthHeaders(),
@@ -607,6 +607,24 @@ $(function () {
                 folderName: NEWS_GALLERY_FOLDER,
             }),
         });
+
+        return request.then(
+            function (response) {
+                return response;
+            },
+            function (xhr) {
+                // Folder creation is idempotent for news uploads.
+                // If folder already exists, continue the flow.
+                if (xhr && xhr.status === 409) {
+                    return {
+                        ok: true,
+                        message: "Folder already exists.",
+                        folderName: NEWS_GALLERY_FOLDER,
+                    };
+                }
+                return $.Deferred().reject(xhr).promise();
+            }
+        );
     };
 
     var uploadNewsImageToGallery = function (file) {
