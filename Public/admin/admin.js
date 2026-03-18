@@ -1726,17 +1726,17 @@ $(function () {
         }
 
         dashboardEndedProjects.text(String(current.slider));
-        dashboardPhotoFolders.text(String(current.imageFolders));
-        dashboardVideoFolders.text(String(current.videoFolders));
+        dashboardPhotoFolders.text(String(current.imageFiles));
+        dashboardVideoFolders.text(String(current.videoFiles));
         dashboardEnquiryQueue.text(String(current.enquiries));
         dashboardNewsCount.text(String(current.news));
 
         updateMetricDelta(dashboardSliderDelta, current.slider - previous.slider);
         if (dashboardPhotoCount.length) {
-            dashboardPhotoCount.text("Total photos: " + String(current.imageFiles));
+            dashboardPhotoCount.text("Photo folders: " + String(current.imageFolders));
         }
         if (dashboardVideoCount.length) {
-            dashboardVideoCount.text("Total videos: " + String(current.videoFiles));
+            dashboardVideoCount.text("Video folders: " + String(current.videoFolders));
         }
         updateMetricDelta(dashboardPhotoDelta, current.imageFiles - previous.imageFiles);
         updateMetricDelta(dashboardVideoDelta, current.videoFiles - previous.videoFiles);
