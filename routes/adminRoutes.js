@@ -28,6 +28,24 @@ var MIME_TO_EXT = {
     "image/jpg": ".jpg",
     "image/png": ".png",
 };
+var NEWS_MEDIA_DIR = path.join(__dirname, "..", "Public", "news-files");
+var NEWS_MEDIA_MAX_SIZE = 8 * 1024 * 1024;
+var NEWS_MEDIA_MIME_TO_EXT = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "application/pdf": ".pdf",
+};
+var newsMediaUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: NEWS_MEDIA_MAX_SIZE },
+    fileFilter: function (req, file, cb) {
+        if (NEWS_MEDIA_MIME_TO_EXT[String(file && file.mimetype || "").toLowerCase()]) {
+            return cb(null, true);
+        }
+        return cb(new Error("Only JPG/PNG/PDF files are allowed."));
+    },
+});
 var VIDEO_ALLOWED_EXTS = [".mp4", ".webm", ".ogg", ".mov", ".m4v"];
 var VIDEO_MIME_TO_EXT = {
     "video/mp4": ".mp4",
@@ -138,6 +156,10 @@ var sanitizeImageBaseName = function (name) {
 
 var ensureGalleryRootDir = async function () {
     await fs.promises.mkdir(GALLERY_IMAGE_ROOT_DIR, { recursive: true });
+};
+
+var ensureNewsMediaDir = async function () {
+    await fs.promises.mkdir(NEWS_MEDIA_DIR, { recursive: true });
 };
 
 var getGalleryFolderDir = function (folderName) {
@@ -761,6 +783,51 @@ router.post("/news-items", adminAuth, async function (req, res) {
         console.error(error);
         return res.status(500).json({ ok: false, message: "Unable to add news item." });
     }
+});
+
+router.post("/news-media", adminAuth, function (req, res) {
+    newsMediaUpload.single("file")(req, res, async function (err) {
+        if (err) {
+            return res.status(400).json({ ok: false, message: err.message });
+        }
+
+        var file = req.file;
+        if (!file) {
+            return res.status(400).json({ ok: false, message: "No file uploaded." });
+        }
+
+        try {
+            await ensureNewsMediaDir();
+
+            var mimeType = String(file.mimetype || "").toLowerCase();
+            var ext = NEWS_MEDIA_MIME_TO_EXT[mimeType];
+            if (!ext) {
+                return res.status(400).json({ ok: false, message: "Only JPG/PNG/PDF files are allowed." });
+            }
+
+            var originalExt = path.extname(String(file.originalname || "")).toLowerCase();
+            var originalBase = path.basename(String(file.originalname || ""), originalExt);
+            var baseName = sanitizeImageBaseName(originalBase || "news-file");
+            var uniquePart = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+            var fileName = baseName + "-" + uniquePart + ext;
+            var savePath = path.join(NEWS_MEDIA_DIR, fileName);
+            await fs.promises.writeFile(savePath, file.buffer);
+
+            return res.json({
+                ok: true,
+                message: "File uploaded successfully.",
+                file: {
+                    name: fileName,
+                    path: "/news-files/" + fileName,
+                    mimeType: mimeType,
+                    size: Number(file.size) || 0,
+                },
+            });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ ok: false, message: "Unable to upload file." });
+        }
+    });
 });
 
 router.put("/news-scroll-state", adminAuth, async function (req, res) {

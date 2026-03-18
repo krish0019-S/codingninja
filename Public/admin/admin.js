@@ -114,7 +114,6 @@ $(function () {
     var dashboardAnalyticsChart = null;
     var analyticsRefreshTimer = null;
     var lastAnalyticsSnapshot = null;
-    var NEWS_GALLERY_FOLDER = "news";
     var NEWS_CONTENT_MAX_LENGTH = 1210;
 
     var currentBanners = [];
@@ -597,43 +596,40 @@ $(function () {
         }
     };
 
-    var ensureNewsGalleryFolder = function () {
-        var request = $.ajax({
-            url: "/admin/gallery-folders",
-            method: "POST",
-            headers: getAuthHeaders(),
-            contentType: "application/json",
-            data: JSON.stringify({
-                folderName: NEWS_GALLERY_FOLDER,
-            }),
-        });
-
-        return request.then(
-            function (response) {
-                return response;
-            },
-            function (xhr) {
-                // Folder creation is idempotent for news uploads.
-                // If folder already exists, continue the flow.
-                if (xhr && xhr.status === 409) {
-                    return {
-                        ok: true,
-                        message: "Folder already exists.",
-                        folderName: NEWS_GALLERY_FOLDER,
-                    };
-                }
-                return $.Deferred().reject(xhr).promise();
-            }
-        );
+    var isPdfNewsUrl = function (value) {
+        return /\.pdf(?:[?#].*)?$/i.test(String(value || ""));
     };
 
-    var uploadNewsImageToGallery = function (file) {
+    var getNewsFileNameFromUrl = function (value) {
+        var raw = String(value || "");
+        if (!raw) {
+            return "";
+        }
+        try {
+            var parsed = new URL(raw, window.location.origin);
+            var pathname = String(parsed.pathname || "");
+            var fileName = pathname.split("/").pop() || "";
+            return decodeURIComponent(fileName);
+        } catch (error) {
+            return String(raw).split("/").pop() || "";
+        }
+    };
+
+    var isAllowedNewsMediaFile = function (file) {
+        var mime = String(file && file.type || "").toLowerCase();
+        if (mime === "image/jpeg" || mime === "image/jpg" || mime === "image/png" || mime === "application/pdf") {
+            return true;
+        }
+        var name = String(file && file.name || "").toLowerCase();
+        return /\.(?:jpe?g|png|pdf)$/.test(name);
+    };
+
+    var uploadNewsMediaFile = function (file) {
         var formData = new FormData();
-        formData.append("folder", NEWS_GALLERY_FOLDER);
-        formData.append("images", file);
+        formData.append("file", file);
 
         return $.ajax({
-            url: "/admin/gallery-images",
+            url: "/admin/news-media",
             method: "POST",
             data: formData,
             processData: false,
@@ -889,15 +885,28 @@ $(function () {
                 sequence = index + 1;
             }
             var sequenceOptions = buildSequenceOptions(rows.length, sequence);
+            var imageIsPdf = isPdfNewsUrl(imageUrl);
+            var fileName = getNewsFileNameFromUrl(imageUrl) || "Open file";
             var imageHtml = imageUrl
                 ? (
-                    '<div class="news-item-media">' +
-                        '<a class="news-item-image-link" href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                            '<img class="news-item-image" src="' + escapeHtml(imageUrl) + '" alt="' + title + ' image" loading="lazy">' +
-                        "</a>" +
-                    "</div>"
+                    imageIsPdf
+                        ? (
+                            '<div class="news-item-media">' +
+                                '<a class="news-item-image-link news-item-file-link" href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                                    '<span class="news-item-file-badge">PDF</span>' +
+                                    '<span class="news-item-file-name">' + escapeHtml(fileName) + "</span>" +
+                                "</a>" +
+                            "</div>"
+                        )
+                        : (
+                            '<div class="news-item-media">' +
+                                '<a class="news-item-image-link" href="' + escapeHtml(imageUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                                    '<img class="news-item-image" src="' + escapeHtml(imageUrl) + '" alt="' + title + ' image" loading="lazy">' +
+                                "</a>" +
+                            "</div>"
+                        )
                 )
-                : '<div class="news-item-media news-item-media-empty"><span class="news-item-image-empty">No image</span></div>';
+                : '<div class="news-item-media news-item-media-empty"><span class="news-item-image-empty">No media</span></div>';
 
             var linkHtml = linkUrl
                 ? (
@@ -2911,38 +2920,28 @@ $(function () {
             return;
         }
 
-        ensureNewsGalleryFolder()
-            .done(function () {
-                uploadNewsImageToGallery(imageFile)
-                    .done(function (response) {
-                        var uploadedList = Array.isArray(response && response.uploaded) ? response.uploaded : [];
-                        var uploadedPath = normalizeNewsUrl(uploadedList[0] && uploadedList[0].path);
-                        if (!uploadedPath) {
-                            showAlert("Image uploaded but path was invalid. Please try again.", "danger");
-                            setFormBusy(false);
-                            return;
-                        }
-                        saveNewsItem(uploadedPath);
-                    })
-                    .fail(function (xhr) {
-                        if (handleAuthError(xhr)) {
-                            setFormBusy(false);
-                            return;
-                        }
-                        var msg = "Unable to upload image into gallery.";
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            msg = xhr.responseJSON.message;
-                        }
-                        showAlert(msg, "danger");
-                        setFormBusy(false);
-                    });
+        if (!isAllowedNewsMediaFile(imageFile)) {
+            showAlert("Please select a JPG, PNG, or PDF file.", "danger");
+            setFormBusy(false);
+            return;
+        }
+
+        uploadNewsMediaFile(imageFile)
+            .done(function (response) {
+                var uploadedPath = normalizeNewsUrl(response && response.file && response.file.path);
+                if (!uploadedPath) {
+                    showAlert("File uploaded but path was invalid. Please try again.", "danger");
+                    setFormBusy(false);
+                    return;
+                }
+                saveNewsItem(uploadedPath);
             })
             .fail(function (xhr) {
                 if (handleAuthError(xhr)) {
                     setFormBusy(false);
                     return;
                 }
-                var msg = "Unable to prepare gallery folder.";
+                var msg = "Unable to upload file.";
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     msg = xhr.responseJSON.message;
                 }
