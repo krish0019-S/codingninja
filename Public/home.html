@@ -760,7 +760,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="homeEnquiryMessage">Message</label>
-                    <textarea id="homeEnquiryMessage" class="form-control" name="message" rows="4" maxlength="200" placeholder="Write your message here..." required></textarea>
+                    <textarea id="homeEnquiryMessage" class="form-control" name="message" rows="4" maxlength="100" placeholder="Write your message here..." required></textarea>
                 </div>
                 <div class="mb-3 contact-robot-check">
                     <div class="form-check">
@@ -793,7 +793,7 @@
                 setTimeout(() => loader.classList.add("hidden"), 300);
             }
 
-            window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+            window.scrollTo({ top: 0, left: 0, behavior: "auto" });
         });
 
         window.addEventListener("beforeunload", () => {
@@ -917,9 +917,27 @@
         };
 
         if (enquiryModal) {
-            window.addEventListener("load", () => {
-                setTimeout(openEnquiryModal, 650);
-            });
+            var enquiryAutoOpenScheduled = false;
+            var scheduleEnquiryAutoOpen = (delayMs) => {
+                if (enquiryAutoOpenScheduled) {
+                    return;
+                }
+                enquiryAutoOpenScheduled = true;
+                window.setTimeout(() => {
+                    openEnquiryModal();
+                }, Math.max(0, Number(delayMs) || 0));
+            };
+
+            if (document.readyState === "complete" || document.readyState === "interactive") {
+                scheduleEnquiryAutoOpen(650);
+            } else {
+                document.addEventListener("DOMContentLoaded", () => {
+                    scheduleEnquiryAutoOpen(650);
+                }, { once: true });
+                window.addEventListener("load", () => {
+                    scheduleEnquiryAutoOpen(0);
+                }, { once: true });
+            }
 
             if (enquiryCloseButton) {
                 enquiryCloseButton.addEventListener("click", closeEnquiryModal);
