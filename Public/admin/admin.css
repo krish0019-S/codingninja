@@ -2928,7 +2928,7 @@ body.admin-body.is-ready .admin-layout {
     .news-item-image-link,
     .news-item-file-link,
     .news-item-media-empty {
-        width: min(100%, 238px);
+        width: min(100%, 202px);
     }
 
     .news-form-actions .btn {
