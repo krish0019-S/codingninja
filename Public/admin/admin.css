@@ -2353,6 +2353,32 @@ body.admin-body.is-ready .admin-layout {
     }
 }
 
+@media (min-width: 1281px) and (max-width: 1440px) {
+    .news-list-head,
+    .news-item-card {
+        grid-template-columns: 64px minmax(0, 1.8fr) minmax(0, 1.3fr) minmax(100px, 0.9fr) minmax(130px, 1fr);
+        gap: 14px;
+    }
+
+    .news-item-card {
+        font-size: 80%;
+    }
+
+    .news-item-col-link {
+        padding-right: 19px;
+    }
+
+    .news-item-col-date {
+        padding-left: 12px;
+    }
+
+    .news-item-image-link,
+    .news-item-file-link,
+    .news-item-media-empty {
+        width: min(100%, 255px);
+    }
+}
+
 @media (max-width: 1280px) {
     .dashboard-metrics {
         grid-template-columns: repeat(2, minmax(0, 1fr));
