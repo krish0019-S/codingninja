@@ -2353,7 +2353,7 @@ body.admin-body.is-ready .admin-layout {
     }
 }
 
-@media (min-width: 1281px) and (max-width: 1440px) {
+@media (min-width: 1440px) and (max-width: 2560px) {
     .news-list-head,
     .news-item-card {
         grid-template-columns: 64px minmax(0, 1.8fr) minmax(0, 1.3fr) minmax(100px, 0.9fr) minmax(130px, 1fr);
