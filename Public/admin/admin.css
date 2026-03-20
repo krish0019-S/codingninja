@@ -2139,7 +2139,7 @@ body.admin-body.is-ready .admin-layout {
 
 .news-item-image-link {
     display: block;
-    width: min(100%, 255px);
+    width: min(100%, 355px);
     aspect-ratio: 16 / 10;
     padding: 4px;
     border-radius: 14px;
@@ -2380,29 +2380,79 @@ body.admin-body.is-ready .admin-layout {
 }
 
 @media (max-width: 1024px) {
+    .news-list-head {
+        padding: 12px;
+        font-size: 0.72rem;
+    }
+
     .news-list-head,
     .news-item-card {
-        grid-template-columns: 52px minmax(0, 1.55fr) minmax(0, 1fr) minmax(88px, 0.82fr) minmax(112px, 0.88fr);
+        grid-template-columns: 50px minmax(0, 1.45fr) minmax(0, 0.9fr) minmax(100px, 0.88fr) minmax(112px, 0.9fr);
         gap: 10px;
     }
 
+    .news-item-card {
+        padding: 12px;
+        font-size: 74%;
+    }
+
     .news-item-col-link {
-        gap: 8px;
+        gap: 10px;
+        padding-right: 24px;
+    }
+
+    .news-item-col-date {
+        padding-left: 34px;
+    }
+
+    .news-item-title {
+        font-size: 1.02em;
+    }
+
+    .news-item-content {
+        font-size: 0.9em;
+    }
+
+    .news-item-link-text {
+        font-size: 0.8em;
+    }
+
+    .news-item-date {
+        font-size: 0.95em;
+    }
+
+    .news-item-time {
+        font-size: 0.88em;
     }
 
     .news-item-image-link,
     .news-item-file-link,
     .news-item-media-empty {
-        width: min(100%, 180px);
+        width: min(100%, 142px);
+        border-radius: 12px;
     }
 
     .news-item-file-link {
-        gap: 8px;
-        padding: 10px 12px;
+        aspect-ratio: 16 / 10;
+        gap: 6px;
+        padding: 4px;
     }
 
     .news-item-file-name {
+        font-size: 0.76em;
+    }
+
+    .news-item-actions {
+        gap: 6px;
+    }
+
+    .news-sequence-controls {
+        gap: 6px;
+    }
+
+    .news-item-actions .btn {
         font-size: 0.8em;
+        padding: 4px 8px;
     }
 }
 
