@@ -9,6 +9,11 @@ body {
     overflow: hidden;
 }
 
+.services-3d-hero::before,
+.services-3d-hero::after {
+    display: none;
+}
+
 .services-3d-inner {
     width: min(1180px, 92%);
     margin: 0 auto;
