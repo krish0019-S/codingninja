@@ -894,20 +894,22 @@ main {
 
 .services-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 28px
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 22px
 }
 
 .service-card {
     background: #fff;
     border-radius: 22px;
-    padding: 34px 32px;
+    padding: 28px 18px;
     box-shadow: 0 18px 40px rgb(0 0 0 / .08);
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
+    align-items: center;
+    text-align: center;
     transition: transform 0.3s ease, box-shadow 0.3s ease
 }
 
@@ -984,7 +986,7 @@ main {
 
 .service-card h3 {
     font-family: "Sora", sans-serif;
-    font-size: 1.4rem;
+    font-size: 1.05rem;
     color: #222
 }
 
@@ -3096,7 +3098,39 @@ body.enquiry-open {
     }
 
     .services-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr))
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px
+    }
+
+    .service-card {
+        padding: 24px 16px;
+        border-radius: 16px;
+        gap: 12px
+    }
+
+    .service-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px
+    }
+
+    .service-icon svg {
+        width: 24px;
+        height: 24px
+    }
+
+    .service-kicker {
+        font-size: .67rem
+    }
+
+    .service-card h3 {
+        font-size: .98rem
+    }
+
+    .service-btn {
+        font-size: .78rem;
+        padding: 8px 12px;
+        gap: 6px
     }
 
     .promo-card {
@@ -3146,6 +3180,12 @@ body.enquiry-open {
 
     .footer-logo {
         width: min(420px, 92%)
+    }
+}
+
+@media (max-width:991px) {
+    .services-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -3276,7 +3316,37 @@ body.enquiry-open {
     }
 
     .services-grid {
-        grid-template-columns: 1fr
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px
+    }
+
+    .service-card {
+        padding: 18px 12px;
+        gap: 10px
+    }
+
+    .service-icon {
+        width: 40px;
+        height: 40px
+    }
+
+    .service-icon svg {
+        width: 21px;
+        height: 21px
+    }
+
+    .service-kicker {
+        font-size: .62rem
+    }
+
+    .service-card h3 {
+        font-size: .9rem;
+        line-height: 1.25
+    }
+
+    .service-btn {
+        font-size: .72rem;
+        padding: 7px 10px
     }
 
     .services-head {

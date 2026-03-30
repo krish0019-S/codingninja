@@ -519,7 +519,7 @@ body.admin-body.is-ready .admin-layout {
 }
 
 .dashboard-topbar {
-    background: linear-gradient(180deg, #120909 0%,  #451110 100%);
+    background: linear-gradient(180deg, #120909 0%, #451110 100%);
     min-height: 48px;
     margin:
         calc(-1 * var(--content-pad-y)) calc(-1 * var(--content-pad-x)) 16px calc(-1 * var(--content-pad-x));
@@ -1914,6 +1914,7 @@ body.admin-body.is-ready .admin-layout {
 }
 
 @media (min-width: 769px) {
+
     .enquiry-table th:nth-child(5),
     .enquiry-table td:nth-child(5) {
         padding-right: 3px;
@@ -1923,7 +1924,7 @@ body.admin-body.is-ready .admin-layout {
     .enquiry-table th:nth-child(6),
     .enquiry-table td:nth-child(6) {
         padding-left: 30px;
-        
+
     }
 }
 
@@ -2241,8 +2242,8 @@ body.admin-body.is-ready .admin-layout {
 .news-item-date,
 .news-item-time {
     display: block;
-    line-height: 1.2;   
-    
+    line-height: 1.2;
+
 }
 
 .news-item-date {
@@ -2354,6 +2355,7 @@ body.admin-body.is-ready .admin-layout {
 }
 
 @media (min-width: 1440px) and (max-width: 2560px) {
+
     .news-list-head,
     .news-item-card {
         grid-template-columns: 64px minmax(0, 1.8fr) minmax(0, 1.3fr) minmax(100px, 0.9fr) minmax(130px, 1fr);
@@ -2669,7 +2671,7 @@ body.admin-body.is-ready .admin-layout {
         text-align: left;
     }
 
-    .enquiry-table td > * {
+    .enquiry-table td>* {
         min-width: 0;
         text-align: left;
     }
@@ -2922,7 +2924,7 @@ body.admin-body.is-ready .admin-layout {
         text-align: left;
     }
 
-    .enquiry-table td > * {
+    .enquiry-table td>* {
         min-width: 0;
         text-align: left;
     }
