@@ -296,6 +296,11 @@ body.nav-open {
     background-size: 0% 2px
 }
 
+.nav-links > a,
+.nav-links > .nav-dropdown > .nav-gallery-toggle {
+    padding-left: 10px
+}
+
 .nav-links a::before {
     content: "";
     width: 16px;
@@ -2984,7 +2989,11 @@ body.enquiry-open {
 
     .nav-links > a {
         text-align: left;
-        padding: 6px 0
+        padding: 6px 0 6px 10px
+    }
+
+    .nav-links > .nav-dropdown > .nav-gallery-toggle {
+        padding: 6px 0 6px 10px
     }
 
     .nav-links a::before {
