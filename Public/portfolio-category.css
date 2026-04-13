@@ -1,0 +1,227 @@
+.portfolio-page {
+    background: #f7f8fb;
+}
+
+.portfolio-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 112px 0 96px;
+    background: radial-gradient(circle at 18% 10%, rgba(179, 18, 23, 0.22), transparent 45%),
+        radial-gradient(circle at 92% 88%, rgba(242, 171, 50, 0.16), transparent 42%),
+        linear-gradient(130deg, #0d1018 0%, #161d2d 45%, #25111a 100%);
+    color: #fff;
+}
+
+.portfolio-hero::before,
+.portfolio-hero::after {
+    content: "";
+    position: absolute;
+    border-radius: 999px;
+    pointer-events: none;
+}
+
+.portfolio-hero::before {
+    width: 240px;
+    height: 240px;
+    right: -70px;
+    top: -110px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.portfolio-hero::after {
+    width: 300px;
+    height: 300px;
+    left: -110px;
+    bottom: -140px;
+    background: rgba(179, 18, 23, 0.2);
+}
+
+.portfolio-hero-inner {
+    width: min(1180px, 92%);
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+}
+
+.portfolio-kicker {
+    margin: 0 0 14px;
+    font-family: "Sora", sans-serif;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-size: 0.84rem;
+    color: #f6c46e;
+}
+
+.portfolio-hero h1 {
+    margin: 0;
+    font-family: "Sora", sans-serif;
+    font-size: clamp(2rem, 3.8vw, 3.4rem);
+    line-height: 1.06;
+}
+
+.portfolio-subtitle {
+    margin: 16px 0 0;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.72;
+    font-size: 1rem;
+}
+
+.portfolio-crumbs {
+    margin: 18px 0 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: "Sora", sans-serif;
+    font-size: 0.86rem;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.76);
+}
+
+.portfolio-crumbs a {
+    color: #fff;
+    font-weight: 600;
+}
+
+.portfolio-content-wrap {
+    width: min(1180px, 92%);
+    margin: 56px auto 82px;
+}
+
+.portfolio-layout {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 20px;
+}
+
+.portfolio-panel {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 16px 35px rgba(15, 23, 42, 0.08);
+    padding: 26px 24px;
+}
+
+.portfolio-panel h2 {
+    margin: 0;
+    font-family: "Sora", sans-serif;
+    font-size: clamp(1.2rem, 2vw, 1.52rem);
+    color: #101828;
+}
+
+.portfolio-panel p {
+    margin: 12px 0 0;
+    color: #475467;
+    line-height: 1.72;
+}
+
+.portfolio-list {
+    margin: 16px 0 0;
+    padding-left: 20px;
+    color: #1f2937;
+    line-height: 1.7;
+}
+
+.portfolio-list li + li {
+    margin-top: 8px;
+}
+
+.portfolio-metrics {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.portfolio-metric {
+    border: 1px solid rgba(179, 18, 23, 0.2);
+    border-radius: 12px;
+    background: rgba(179, 18, 23, 0.06);
+    padding: 12px 10px;
+    text-align: center;
+}
+
+.portfolio-metric strong {
+    display: block;
+    font-family: "Sora", sans-serif;
+    color: #7a0f13;
+    font-size: 1.05rem;
+}
+
+.portfolio-metric span {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: #5f6673;
+}
+
+.portfolio-cta {
+    margin-top: 16px;
+}
+
+.portfolio-actions {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.portfolio-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 999px;
+    font-family: "Sora", sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 10px 16px;
+    border: 1px solid transparent;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.portfolio-btn:hover {
+    transform: translateY(-1px);
+}
+
+.portfolio-btn-primary {
+    background: var(--red);
+    color: #fff;
+    box-shadow: 0 12px 22px rgba(179, 18, 23, 0.28);
+}
+
+.portfolio-btn-secondary {
+    border-color: rgba(17, 24, 39, 0.16);
+    color: #1f2937;
+    background: #fff;
+}
+
+.portfolio-note {
+    margin: 30px auto 0;
+    width: min(1180px, 92%);
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.92rem;
+}
+
+@media (max-width: 980px) {
+    .portfolio-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .portfolio-hero {
+        padding: 92px 0 76px;
+    }
+}
+
+@media (max-width: 640px) {
+    .portfolio-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .portfolio-panel {
+        padding: 22px 18px;
+    }
+}

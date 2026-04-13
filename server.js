@@ -273,6 +273,48 @@ app.get("/video-gallery", function (req, resp) {
     resp.sendFile(fullpath);
 });
 
+app.get("/printing", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/printing.html";
+    resp.sendFile(fullpath);
+});
+
+app.get("/outdoor", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/outdoor.html";
+    resp.sendFile(fullpath);
+});
+
+app.get("/online", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/online.html";
+    resp.sendFile(fullpath);
+});
+
+app.get("/photoshot-video", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/photoshot-video.html";
+    resp.sendFile(fullpath);
+});
+
+app.get("/events", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/events.html";
+    resp.sendFile(fullpath);
+});
+
+app.get("/promotional", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/promotional.html";
+    resp.sendFile(fullpath);
+});
+
+app.get("/electrronic-ads", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/electrronic-ads.html";
+    resp.sendFile(fullpath);
+});
+
 app.get("/signup", function (req, resp) {
     let dirName = __dirname;
     let fullpath = dirName + "/Public/signup.html";
