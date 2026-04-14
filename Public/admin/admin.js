@@ -24,6 +24,16 @@ $(function () {
     var dashboardSection = $("#dashboardSection");
     var bannersSection = $("#bannersSection");
     var enquiriesSection = $("#enquiriesSection");
+    var portfolioSection = $("#portfolioSection");
+    var portfolioCategorySelect = $("#portfolioCategorySelect");
+    var activePortfolioFolderBadge = $("#activePortfolioFolderBadge");
+    var addPortfolioFilesBtn = $("#addPortfolioFilesBtn");
+    var addPortfolioFilesInput = $("#addPortfolioFilesInput");
+    var newPortfolioFolderName = $("#newPortfolioFolderName");
+    var createPortfolioFolderBtn = $("#createPortfolioFolderBtn");
+    var deletePortfolioFolderBtn = $("#deletePortfolioFolderBtn");
+    var portfolioFolderCardGrid = $("#portfolioFolderCardGrid");
+    var portfolioFileGrid = $("#portfolioFileGrid");
     var newsSection = $("#newsSection");
     var imagesSection = $("#imagesSection");
     var videosSection = $("#videosSection");
@@ -99,6 +109,8 @@ $(function () {
     var currentGalleryFolderOrder = [];
     var currentVideoFolder = "";
     var currentVideoFolderOrder = [];
+    var currentPortfolioCategory = "printing";
+    var currentPortfolioFolder = "";
     var dashboardMetrics = {
         videos: 0,
         images: 0,
@@ -1453,6 +1465,190 @@ $(function () {
         videoFileGrid.html(cards || '<div class="col-12"><div class="banner-empty-state">No videos found in /videos/gallery.</div></div>');
     };
 
+    var updateActivePortfolioFolderBadge = function () {
+        if (!activePortfolioFolderBadge.length) return;
+        if (!currentPortfolioFolder) {
+            activePortfolioFolderBadge.text("Folder: -");
+            return;
+        }
+        activePortfolioFolderBadge.text("Folder: " + currentPortfolioFolder);
+    };
+
+    var renderPortfolioFolderCards = function (folders, preferredFolder) {
+        var list = Array.isArray(folders) ? folders : [];
+        if (!list.length) {
+            currentPortfolioFolder = "";
+            updateActivePortfolioFolderBadge();
+            portfolioFolderCardGrid.html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
+            return false;
+        }
+        
+        var normalizedCards = list.map(function (item) {
+            var name = normalizeFolderName(item && item.name);
+            return {
+                name: name,
+                fileCount: Number(item && item.fileCount) || 0,
+                coverPath: String((item && item.coverPath) || ""),
+                coverType: String((item && item.coverType) || "")
+            };
+        }).filter(function (item) { return Boolean(item.name); });
+
+        if (!normalizedCards.length) {
+            currentPortfolioFolder = "";
+            updateActivePortfolioFolderBadge();
+            portfolioFolderCardGrid.html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
+            return false;
+        }
+        
+        var selected = normalizeFolderName(preferredFolder);
+        var exists = normalizedCards.some(function (item) { return item.name === selected; });
+        if (!selected || !exists) {
+            selected = normalizedCards[0].name;
+        }
+        
+        currentPortfolioFolder = selected;
+        updateActivePortfolioFolderBadge();
+        
+        var cardsHtml = normalizedCards.map(function (item) {
+            var activeClass = item.name === selected ? " is-active" : "";
+            var coverMarkup = '<span class="gallery-folder-placeholder">No Media</span>';
+            if (item.coverPath) {
+                if (item.coverType === "video") {
+                    coverMarkup = '<video src="' + item.coverPath + '" muted playsinline preload="metadata"></video>';
+                } else {
+                    coverMarkup = '<img src="' + item.coverPath + '" alt="' + escapeHtml(item.name) + ' cover">';
+                }
+            }
+            
+            return (
+                '<div class="col-sm-6 col-md-4 col-xl-3">' +
+                    '<button class="gallery-folder-card gallery-folder-card-portfolio' + activeClass + '" type="button" data-folder-name="' + item.name + '">' +
+                        '<span class="gallery-folder-cover">' + coverMarkup + '</span>' +
+                        '<span class="gallery-folder-info">' +
+                            '<span class="gallery-folder-name">' + escapeHtml(item.name) + '</span>' +
+                            '<span class="gallery-folder-count">' + String(item.fileCount) + ' file(s)</span>' +
+                        '</span>' +
+                    '</button>' +
+                '</div>'
+            );
+        }).join("");
+        
+        portfolioFolderCardGrid.html(cardsHtml);
+        return true;
+    };
+
+    var renderPortfolioFileEmptyState = function(msg) {
+        portfolioFileGrid.html('<div class="col-12"><div class="banner-empty-state">' + escapeHtml(msg) + '</div></div>');
+    };
+
+    var loadPortfolioFolderCards = function (preferredFolder) {
+        if (!tokenValid()) {
+            renderPortfolioFileEmptyState("Login required to manage portfolio folders.");
+            return;
+        }
+        
+        currentPortfolioCategory = portfolioCategorySelect.val() || "printing";
+        
+        $.ajax({
+            url: "/admin/portfolio-folders?category=" + encodeURIComponent(currentPortfolioCategory),
+            method: "GET",
+            headers: getAuthHeaders(),
+            success: function (response) {
+                var folders = (response && response.folders) || [];
+                var targetFolder = preferredFolder || currentPortfolioFolder;
+                var hasFolder = renderPortfolioFolderCards(folders, targetFolder);
+                if (hasFolder) {
+                    loadPortfolioFiles();
+                } else {
+                    renderPortfolioFileEmptyState("No folder selected.");
+                }
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = "Unable to load folder list.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                showAlert(msg, "danger");
+                portfolioFolderCardGrid.html('<div class="col-12"><div class="banner-empty-state">' + escapeHtml(msg) + '</div></div>');
+                renderPortfolioFileEmptyState(msg);
+            }
+        });
+    };
+
+    portfolioCategorySelect.on("change", function() {
+        currentPortfolioFolder = "";
+        loadPortfolioFolderCards("");
+    });
+
+    var renderPortfolioFiles = function (items) {
+        if (!Array.isArray(items) || !items.length) {
+            renderPortfolioFileEmptyState("No files found in this folder.");
+            return;
+        }
+        
+        var cacheBust = Date.now();
+        var cards = items.map(function (item) {
+            var fileName = String((item && item.name) || "");
+            if (!fileName) return "";
+            
+            var filePath = String((item && item.path) || "");
+            var sizeText = formatBytes(item && item.size);
+            var createdAt = formatDateTime(item && item.createdAt);
+            var isVideo = fileName.toLowerCase().endsWith(".mp4");
+            var previewUrl = filePath + "?v=" + cacheBust;
+            
+            var mediaHtml = isVideo
+                ? '<video src="' + previewUrl + '" controls preload="metadata" playsinline></video>'
+                : '<img src="' + previewUrl + '" alt="' + escapeHtml(fileName) + '">';
+                
+            return (
+                '<div class="col-sm-6 col-lg-4 col-xl-3">' +
+                    '<article class="gallery-image-card" data-file-name="' + fileName + '">' +
+                        '<div class="gallery-image-preview' + (isVideo ? ' gallery-video-preview' : '') + '">' + mediaHtml + '</div>' +
+                        '<div class="gallery-image-body">' +
+                            '<p class="gallery-image-name" title="' + escapeHtml(fileName) + '">' + escapeHtml(fileName) + '</p>' +
+                            '<p class="gallery-image-meta">' + escapeHtml(createdAt) + ' | ' + escapeHtml(sizeText) + '</p>' +
+                            '<button class="btn btn-outline-danger btn-sm btn-portfolio-remove" type="button" data-file-name="' + fileName + '">Delete</button>' +
+                        '</div>' +
+                    '</article>' +
+                '</div>'
+            );
+        }).join("");
+        
+        portfolioFileGrid.html(cards || '<div class="col-12"><div class="banner-empty-state">No files found.</div></div>');
+    };
+
+    var loadPortfolioFiles = function () {
+        if (!tokenValid()) {
+            renderPortfolioFileEmptyState("Login required to manage portfolio folder.");
+            return;
+        }
+        var folderName = normalizeFolderName(currentPortfolioFolder);
+        if (!folderName) {
+            updateActivePortfolioFolderBadge();
+            renderPortfolioFileEmptyState("No folder selected.");
+            return;
+        }
+        
+        $.ajax({
+            url: "/admin/portfolio-files?category=" + encodeURIComponent(currentPortfolioCategory) + "&folder=" + encodeURIComponent(folderName),
+            method: "GET",
+            headers: getAuthHeaders(),
+            success: function (response) {
+                var serverFolder = normalizeFolderName(response && response.folder);
+                if (serverFolder) currentPortfolioFolder = serverFolder;
+                updateActivePortfolioFolderBadge();
+                renderPortfolioFiles((response && response.files) || []);
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = "Unable to load files.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                renderPortfolioFileEmptyState(msg);
+                showAlert(msg, "danger");
+            }
+        });
+    };
+
     var renderAnalyticsTrendLine = function () {
         if (dashboardAnalyticsChart) {
             dashboardAnalyticsChart.resize();
@@ -1853,7 +2049,7 @@ $(function () {
         var url = new URL(window.location.href);
         if (view === "dashboard") {
             url.searchParams.delete("view");
-        } else if (view === "banners" || view === "enquiries" || view === "news" || view === "images" || view === "videos") {
+        } else if (view === "banners" || view === "enquiries" || view === "portfolio" || view === "news" || view === "images" || view === "videos") {
             url.searchParams.set("view", view);
         } else {
             url.searchParams.delete("view");
@@ -1887,7 +2083,7 @@ $(function () {
 
     var setView = function (view, syncUrl) {
         var normalized = "dashboard";
-        if (view === "dashboard" || view === "banners" || view === "enquiries" || view === "news" || view === "images" || view === "videos") {
+        if (view === "dashboard" || view === "banners" || view === "enquiries" || view === "portfolio" || view === "news" || view === "images" || view === "videos") {
             normalized = view;
         }
         currentView = normalized;
@@ -1898,6 +2094,7 @@ $(function () {
         dashboardSection.toggleClass("d-none", normalized !== "dashboard");
         bannersSection.toggleClass("d-none", normalized !== "banners");
         enquiriesSection.toggleClass("d-none", normalized !== "enquiries");
+        portfolioSection.toggleClass("d-none", normalized !== "portfolio");
         newsSection.toggleClass("d-none", normalized !== "news");
         imagesSection.toggleClass("d-none", normalized !== "images");
         videosSection.toggleClass("d-none", normalized !== "videos");
@@ -1915,6 +2112,9 @@ $(function () {
         } else if (normalized === "enquiries") {
             stopAnalyticsAutoRefresh();
             loadEnquiries();
+        } else if (normalized === "portfolio") {
+            stopAnalyticsAutoRefresh();
+            loadPortfolioFolderCards(currentPortfolioFolder);
         } else if (normalized === "news") {
             stopAnalyticsAutoRefresh();
             loadNewsItems();
@@ -1934,7 +2134,7 @@ $(function () {
         try {
             var url = new URL(window.location.href);
             var view = String(url.searchParams.get("view") || "");
-            if (view === "dashboard" || view === "banners" || view === "enquiries" || view === "news" || view === "images" || view === "videos") {
+            if (view === "dashboard" || view === "banners" || view === "enquiries" || view === "portfolio" || view === "news" || view === "images" || view === "videos") {
                 return view;
             }
         } catch (error) {
@@ -3082,6 +3282,178 @@ $(function () {
                 showAlert(msg, "danger");
                 button.prop("disabled", false);
             },
+        });
+    });
+
+    var createPortfolioFolderAction = function () {
+        if (!ensureAuth()) return;
+        
+        var rawName = String(newPortfolioFolderName.val() || "");
+        var folderName = normalizeFolderName(rawName);
+        if (!folderName) {
+            showAlert("Enter a valid folder name.", "danger");
+            return;
+        }
+        
+        createPortfolioFolderBtn.prop("disabled", true);
+        
+        $.ajax({
+            url: "/admin/portfolio-folders",
+            method: "POST",
+            contentType: "application/json",
+            headers: getAuthHeaders(),
+            data: JSON.stringify({ category: currentPortfolioCategory, folderName: folderName }),
+            success: function (response) {
+                var createdName = normalizeFolderName(response && response.folderName) || folderName;
+                newPortfolioFolderName.val("");
+                showAlert(response.message || "Portfolio folder created successfully.", "success");
+                loadPortfolioFolderCards(createdName);
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = "Unable to create folder.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                showAlert(msg, "danger");
+            },
+            complete: function () {
+                createPortfolioFolderBtn.prop("disabled", false);
+            }
+        });
+    };
+
+    createPortfolioFolderBtn.on("click", createPortfolioFolderAction);
+
+    newPortfolioFolderName.on("keydown", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            createPortfolioFolderAction();
+        }
+    });
+
+    deletePortfolioFolderBtn.on("click", function () {
+        if (!ensureAuth()) return;
+        
+        var folderName = normalizeFolderName(currentPortfolioFolder);
+        if (!folderName) {
+            showAlert("Please select a valid folder.", "danger");
+            return;
+        }
+        
+        if (!window.confirm('Delete folder "' + folderName + '" and all files inside it?')) return;
+        
+        deletePortfolioFolderBtn.prop("disabled", true);
+        
+        $.ajax({
+            url: "/admin/portfolio-folders/" + encodeURIComponent(folderName) + "?category=" + encodeURIComponent(currentPortfolioCategory),
+            method: "DELETE",
+            headers: getAuthHeaders(),
+            success: function (response) {
+                currentPortfolioFolder = "";
+                updateActivePortfolioFolderBadge();
+                showAlert(response.message || "Folder deleted successfully.", "success");
+                loadPortfolioFolderCards("");
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = "Unable to delete folder.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                showAlert(msg, "danger");
+            },
+            complete: function () {
+                deletePortfolioFolderBtn.prop("disabled", false);
+            }
+        });
+    });
+
+    portfolioFolderCardGrid.on("click", ".gallery-folder-card-portfolio", function () {
+        var selected = normalizeFolderName($(this).data("folderName"));
+        if (!selected) {
+            showAlert("Invalid folder selected.", "danger");
+            return;
+        }
+        currentPortfolioFolder = selected;
+        portfolioFolderCardGrid.find(".gallery-folder-card-portfolio").removeClass("is-active");
+        $(this).addClass("is-active");
+        updateActivePortfolioFolderBadge();
+        loadPortfolioFiles();
+    });
+
+    addPortfolioFilesBtn.on("click", function () {
+        if (!ensureAuth()) return;
+        addPortfolioFilesInput.val("");
+        addPortfolioFilesInput.trigger("click");
+    });
+
+    addPortfolioFilesInput.on("change", function () {
+        var files = this.files ? Array.from(this.files) : [];
+        if (!files.length) return;
+        if (!ensureAuth()) return;
+        
+        var folderName = normalizeFolderName(currentPortfolioFolder);
+        if (!folderName) {
+            showAlert("Please select a valid folder.", "danger");
+            return;
+        }
+        
+        var formData = new FormData();
+        formData.append("category", currentPortfolioCategory);
+        formData.append("folder", folderName);
+        files.forEach(function (file) { formData.append("files", file); });
+        
+        $.ajax({
+            url: "/admin/portfolio-files",
+            method: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: getAuthHeaders(),
+            success: function (response) {
+                showAlert(response.message || "Files uploaded successfully.", "success");
+                addPortfolioFilesInput.val("");
+                loadPortfolioFolderCards(currentPortfolioFolder);
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = "Unable to upload files.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                showAlert(msg, "danger");
+            }
+        });
+    });
+
+    portfolioFileGrid.on("click", ".btn-portfolio-remove", function () {
+        if (!ensureAuth()) return;
+        
+        var button = $(this);
+        var fileName = String(button.data("fileName") || "").trim();
+        var folderName = normalizeFolderName(currentPortfolioFolder);
+        if (!fileName || !folderName) {
+            showAlert("Invalid file or folder.", "danger");
+            return;
+        }
+        
+        if (!window.confirm("Delete this file?")) return;
+        
+        button.prop("disabled", true);
+        
+        $.ajax({
+            url: "/admin/portfolio-files/" + encodeURIComponent(fileName) + "?category=" + encodeURIComponent(currentPortfolioCategory) + "&folder=" + encodeURIComponent(folderName),
+            method: "DELETE",
+            headers: getAuthHeaders(),
+            success: function (response) {
+                showAlert(response.message || "File removed successfully.", "success");
+                loadPortfolioFolderCards(currentPortfolioFolder);
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) {
+                    button.prop("disabled", false);
+                    return;
+                }
+                var msg = "Unable to remove file.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                showAlert(msg, "danger");
+                button.prop("disabled", false);
+            }
         });
     });
 

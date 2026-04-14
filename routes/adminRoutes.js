@@ -66,6 +66,95 @@ var videoUpload = multer({
     },
 });
 
+var PORTFOLIO_ROOT_DIR = path.join(__dirname, "..", "Public", "portfolio");
+
+var getPortfolioFolderDir = function (category, folderName) {
+    var normCat = normalizeFolderName(category);
+    var normFolder = normalizeFolderName(folderName);
+    if (!normCat || !normFolder) return null;
+    var rootDir = path.resolve(PORTFOLIO_ROOT_DIR, normCat);
+    var folderDir = path.resolve(rootDir, normFolder);
+    if (!folderDir.startsWith(rootDir + path.sep) && folderDir !== rootDir) return null;
+    return folderDir;
+};
+
+var listPortfolioFolders = async function (category) {
+    var normCat = normalizeFolderName(category);
+    if (!normCat) return [];
+    var rootDir = path.join(PORTFOLIO_ROOT_DIR, normCat);
+    try {
+        await fs.promises.mkdir(rootDir, { recursive: true });
+        var entries = await fs.promises.readdir(rootDir, { withFileTypes: true });
+        return entries.filter(function (e) {
+            return e.isDirectory() && GALLERY_FOLDER_REGEX.test(e.name);
+        }).map(function (e) {
+            return e.name;
+        }).sort();
+    } catch (error) {
+        return [];
+    }
+};
+
+var listPortfolioFiles = async function (category, folderName) {
+    var normCat = normalizeFolderName(category);
+    var normFolder = normalizeFolderName(folderName);
+    if (!normCat || !normFolder) throw new Error("Invalid folder.");
+    
+    var folderDir = getPortfolioFolderDir(normCat, normFolder);
+    if (!folderDir) throw new Error("Invalid folder.");
+    
+    try {
+        var stats = await fs.promises.stat(folderDir);
+        if (!stats.isDirectory()) throw new Error("Folder not found.");
+    } catch (e) {
+        throw new Error("Folder not found.");
+    }
+
+    var entries = await fs.promises.readdir(folderDir, { withFileTypes: true });
+    var files = entries.filter(function (e) {
+        if (!e.isFile()) return false;
+        var ext = path.extname(e.name).toLowerCase();
+        return GALLERY_FILE_REGEX.test(e.name) && (ext === ".jpg" || ext === ".jpeg" || ext === ".png" || ext === ".mp4");
+    }).map(function (e) {
+        return e.name;
+    });
+
+    var details = await Promise.all(files.map(async function (fileName) {
+        var filePath = path.join(folderDir, fileName);
+        var stat = await fs.promises.stat(filePath);
+        return {
+            name: fileName,
+            category: normCat,
+            folder: normFolder,
+            path: "/portfolio/" + normCat + "/" + normFolder + "/" + fileName,
+            size: stat.size,
+            createdAt: stat.birthtime || stat.mtime
+        };
+    }));
+
+    return details.sort(function (a, b) {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+};
+
+var PORTFOLIO_MAX_SIZE = 10 * 1024 * 1024; // 10MB
+var PORTFOLIO_MIME_TO_EXT = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "video/mp4": ".mp4",
+};
+var portfolioUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: PORTFOLIO_MAX_SIZE },
+    fileFilter: function (req, file, cb) {
+        if (PORTFOLIO_MIME_TO_EXT[String(file && file.mimetype || "").toLowerCase()]) {
+            return cb(null, true);
+        }
+        return cb(new Error("Only JPG/PNG/MP4 files are allowed."));
+    },
+});
+
 var isValidEmail = function (email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
@@ -1842,6 +1931,159 @@ router.post("/update-banner/:bannerName", adminAuth, function (req, res) {
             return res.status(500).json({ ok: false, message: "Unable to update banner." });
         }
     });
+});
+
+router.get("/portfolio-folders", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    if (!category) return res.status(400).json({ ok: false, message: "Invalid category." });
+    try {
+        var folders = await listPortfolioFolders(category);
+        var cards = await Promise.all(folders.map(async function(folder) {
+            var files = await listPortfolioFiles(category, folder);
+            var coverFile = files.length ? files[files.length - 1] : null;
+            return {
+                name: folder,
+                fileCount: files.length,
+                coverPath: coverFile ? coverFile.path : "",
+                coverType: coverFile ? (coverFile.name.toLowerCase().endsWith(".mp4") ? "video" : "image") : ""
+            };
+        }));
+        return res.json({ ok: true, folders: cards });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to load portfolio folders." });
+    }
+});
+
+router.post("/portfolio-folders", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(getRequestValue(req, "folderName"));
+    if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+
+    try {
+        var existing = await listPortfolioFolders(category);
+        var key = folderKey(folderName);
+        if (existing.some(function(n) { return folderKey(n) === key; })) {
+            return res.status(409).json({ ok: false, message: "Folder already exists." });
+        }
+        var folderDir = getPortfolioFolderDir(category, folderName);
+        await fs.promises.mkdir(folderDir, { recursive: true });
+        
+        var folders = await listPortfolioFolders(category);
+        var cards = await Promise.all(folders.map(async function(folder) {
+            var files = await listPortfolioFiles(category, folder);
+            var coverFile = files.length ? files[files.length - 1] : null;
+            return {
+                name: folder,
+                fileCount: files.length,
+                coverPath: coverFile ? coverFile.path : "",
+                coverType: coverFile ? (coverFile.name.toLowerCase().endsWith(".mp4") ? "video" : "image") : ""
+            };
+        }));
+        return res.json({ ok: true, message: "Portfolio folder created successfully.", folderName: folderName, folders: cards });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to create portfolio folder." });
+    }
+});
+
+router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(req.params.folderName);
+    if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+
+    try {
+        var folderDir = getPortfolioFolderDir(category, folderName);
+        if (!folderDir) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+        await fs.promises.rm(folderDir, { recursive: true, force: false });
+        
+        var folders = await listPortfolioFolders(category);
+        var cards = await Promise.all(folders.map(async function(folder) {
+            var files = await listPortfolioFiles(category, folder);
+            var coverFile = files.length ? files[files.length - 1] : null;
+            return {
+                name: folder,
+                fileCount: files.length,
+                coverPath: coverFile ? coverFile.path : "",
+                coverType: coverFile ? (coverFile.name.toLowerCase().endsWith(".mp4") ? "video" : "image") : ""
+            };
+        }));
+        return res.json({ ok: true, message: "Portfolio folder deleted successfully.", folders: cards });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to delete portfolio folder." });
+    }
+});
+
+router.get("/portfolio-files", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+    if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+    
+    try {
+        var files = await listPortfolioFiles(category, folderName);
+        return res.json({ ok: true, folder: folderName, files: files });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to load portfolio files." });
+    }
+});
+
+router.post("/portfolio-files", adminAuth, function (req, res) {
+    portfolioUpload.array("files")(req, res, async function (err) {
+        if (err) return res.status(400).json({ ok: false, message: err.message });
+        
+        var files = Array.isArray(req.files) ? req.files : [];
+        if (!files.length) return res.status(400).json({ ok: false, message: "No files uploaded." });
+        
+        var category = normalizeFolderName(getRequestValue(req, "category"));
+        var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+        if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+
+        try {
+            var folderDir = getPortfolioFolderDir(category, folderName);
+            if (!folderDir) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+            
+            var uploaded = [];
+            for (var i = 0; i < files.length; i += 1) {
+                var file = files[i];
+                var ext = PORTFOLIO_MIME_TO_EXT[String(file.mimetype || "").toLowerCase()];
+                if (!ext) return res.status(400).json({ ok: false, message: "Invalid file type." });
+                
+                var originalExt = path.extname(String(file.originalname || "")).toLowerCase();
+                var baseName = sanitizeImageBaseName(path.basename(String(file.originalname || ""), originalExt));
+                var uniquePart = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+                var fileName = baseName + "-" + uniquePart + ext;
+                var savePath = path.join(folderDir, fileName);
+                
+                await fs.promises.writeFile(savePath, file.buffer);
+                uploaded.push(fileName);
+            }
+            
+            var fileList = await listPortfolioFiles(category, folderName);
+            return res.json({ ok: true, message: "Files uploaded successfully.", files: fileList });
+        } catch (error) {
+            return res.status(500).json({ ok: false, message: "Unable to upload files." });
+        }
+    });
+});
+
+router.delete("/portfolio-files/:fileName", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+    var fileName = String(req.params.fileName || "").trim();
+    
+    if (!category || !folderName || !fileName || !GALLERY_FILE_REGEX.test(fileName)) {
+        return res.status(400).json({ ok: false, message: "Invalid file name." });
+    }
+    
+    try {
+        var folderDir = getPortfolioFolderDir(category, folderName);
+        var targetPath = path.resolve(folderDir, fileName);
+        if (!targetPath.startsWith(folderDir + path.sep)) return res.status(400).json({ ok: false, message: "Invalid file name." });
+        
+        await fs.promises.unlink(targetPath);
+        var fileList = await listPortfolioFiles(category, folderName);
+        return res.json({ ok: true, message: "File removed successfully.", files: fileList });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to remove file." });
+    }
 });
 
 module.exports = router;

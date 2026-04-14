@@ -58,6 +58,9 @@
                 <a class="nav-link" href="#" data-admin-view="enquiries">
                     <span>Enquiry</span>
                 </a>
+                <a class="nav-link" href="#" data-admin-view="portfolio">
+                    <span>Portfolio</span>
+                </a>
                 <a class="nav-link" href="#" data-admin-view="news">
                     <span>News</span>
                 </a>
@@ -226,6 +229,55 @@
 
                 <div id="enquiryListWrap" class="enquiry-list-wrap">
                     <div class="banner-empty-state">Loading enquiries...</div>
+                </div>
+            </section>
+
+            <section id="portfolioSection" class="admin-section d-none">
+                <header class="content-header">
+                    <div>
+                        <h1>Portfolio Manager</h1>
+                        <p>Manage portfolio categories and items.</p>
+                    </div>
+                    <div class="header-actions">
+                        <span class="badge bg-soft">Folder: /portfolio</span>
+                        <button class="btn btn-outline-danger btn-sm logout-btn" type="button">Logout</button>
+                    </div>
+                </header>
+                
+                <div class="manager-toolbar">
+                    <h2 class="manager-title">Portfolio Folders</h2>
+                    <div class="manager-actions">
+                        <select class="form-select form-select-sm" id="portfolioCategorySelect">
+                            <option value="printing">PRINTING</option>
+                            <option value="outdoor">Outdoor</option>
+                            <option value="online">Online</option>
+                            <option value="photoshot-video">Photoshot & Video</option>
+                            <option value="events">Events</option>
+                            <option value="promotional">Promotional</option>
+                            <option value="electronic-ads">Electronic ADS</option>
+                        </select>
+                        <span class="badge bg-soft" id="activePortfolioFolderBadge">Folder: -</span>
+                        <input class="d-none" id="addPortfolioFilesInput" type="file" accept="image/jpeg,image/png,video/mp4" multiple>
+                        <button class="btn btn-primary btn-sm" type="button" id="addPortfolioFilesBtn">Upload Files</button>
+                    </div>
+                </div>
+
+                <div class="folder-create-row">
+                    <input class="form-control form-control-sm" id="newPortfolioFolderName" type="text" maxlength="40" placeholder="Enter new project folder name (example: summer campaign)">
+                    <button class="btn btn-outline-primary btn-sm" type="button" id="createPortfolioFolderBtn">Create Folder</button>
+                    <button class="btn btn-outline-danger btn-sm" type="button" id="deletePortfolioFolderBtn">Delete Folder</button>
+                </div>
+
+                <div class="row g-3 folder-card-grid" id="portfolioFolderCardGrid">
+                    <div class="col-12">
+                        <div class="banner-empty-state">Loading folders...</div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-1" id="portfolioFileGrid">
+                    <div class="col-12">
+                        <div class="banner-empty-state">Loading portfolio files...</div>
+                    </div>
                 </div>
             </section>
 
