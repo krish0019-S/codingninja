@@ -169,6 +169,226 @@
         });
     }
 
+    // Fetch and render portfolio for frontend pages
+    var portfolioCategory = document.body.getAttribute("data-portfolio-category");
+    if (portfolioCategory) {
+        var publicFolderGrid = document.querySelector("[data-public-folder-grid]");
+        var publicImageGrid = document.querySelector("[data-public-image-grid]");
+        var publicSelectedFolder = document.querySelector("[data-public-selected-folder]");
+        var publicBrowserTitle = document.querySelector("[data-public-browser-title]");
+        var publicBrowserSubtitle = document.querySelector("[data-public-browser-subtitle]");
+        var publicFolderBack = document.querySelector("[data-public-folder-back]");
+        
+        var currentPublicFolder = String(new URLSearchParams(window.location.search).get("folder") || "").trim().toLowerCase();
+
+        var escapeHtml = function (text) {
+            return String(text == null ? "" : text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        };
+
+        var prettifyName = function (value) {
+            return String(value || "").trim().replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+        };
+
+        var setPublicViewMode = function (mode, folderName) {
+            var isFolderView = mode === "folder";
+            if (publicFolderGrid) publicFolderGrid.hidden = isFolderView;
+            if (publicImageGrid) publicImageGrid.hidden = !isFolderView;
+            if (publicSelectedFolder) publicSelectedFolder.hidden = !isFolderView;
+            if (publicFolderBack) publicFolderBack.hidden = !isFolderView;
+            
+            if (publicBrowserTitle) {
+                publicBrowserTitle.textContent = isFolderView ? prettifyName(folderName) + " Folder" : "Project Folders";
+            }
+            if (publicBrowserSubtitle) {
+                publicBrowserSubtitle.textContent = isFolderView ? "Showing media uploaded in this folder." : "Open a folder to view our work.";
+            }
+            if (publicSelectedFolder) {
+                publicSelectedFolder.textContent = isFolderView ? "Folder: " + prettifyName(folderName) : "Folder: -";
+            }
+            if (publicFolderBack) {
+                var url = new URL(window.location.href);
+                url.searchParams.delete("folder");
+                publicFolderBack.href = url.toString();
+            }
+        };
+
+        if (publicFolderBack) {
+            publicFolderBack.addEventListener("click", function(e) {
+                e.preventDefault();
+                var url = new URL(window.location.href);
+                url.searchParams.delete("folder");
+                window.history.pushState({}, "", url);
+                setPublicViewMode("folders", "");
+                currentPublicFolder = "";
+            });
+        }
+
+        var loadPortfolioFiles = function (folderName) {
+            if (!folderName) return;
+            fetch("/admin/portfolio-files-public?category=" + encodeURIComponent(portfolioCategory) + "&folder=" + encodeURIComponent(folderName))
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (!data.ok) throw new Error(data.message);
+                    setPublicViewMode("folder", folderName);
+                    
+                    var files = data.files || [];
+                    if (!files.length) {
+                        publicImageGrid.innerHTML = '<div class="gallery-empty-state">No items found in this folder.</div>';
+                        return;
+                    }
+                    
+                    var cards = files.map(function (item) {
+                        var filePath = String(item.path || "");
+                        var fileName = String(item.name || "");
+                        var title = prettifyName(fileName);
+                        var isVideo = fileName.toLowerCase().endsWith(".mp4");
+                        
+                        var mediaMarkup = isVideo
+                            ? '<video src="' + escapeHtml(filePath) + '" controls preload="metadata"></video>'
+                            : '<img src="' + escapeHtml(filePath) + '" alt="' + escapeHtml(title) + '" loading="lazy">';
+                            
+                        return (
+                            '<article class="gallery-card gallery-card-public' + (isVideo ? ' gallery-video-card' : '') + '">' +
+                                '<button class="gallery-open" type="button" data-lightbox-open data-full="' + escapeHtml(filePath) + '" data-title="' + escapeHtml(title) + '" data-meta="' + escapeHtml(folderName) + '" data-type="' + (isVideo ? 'video' : 'image') + '">' +
+                                    (isVideo ? '<div class="gallery-video-frame">' + mediaMarkup + '</div>' : mediaMarkup) +
+                                    '<span class="gallery-overlay"><span>' + escapeHtml(folderName) + '</span></span>' +
+                                '</button>' +
+                            '</article>'
+                        );
+                    }).join("");
+                    
+                    publicImageGrid.innerHTML = cards;
+                })
+                .catch(function(err) {
+                    publicImageGrid.innerHTML = '<div class="gallery-empty-state">Unable to load files.</div>';
+                });
+        };
+
+        var loadPortfolioFolders = function () {
+            fetch("/admin/portfolio-folders-public?category=" + encodeURIComponent(portfolioCategory))
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (!data.ok) throw new Error(data.message);
+                    var folders = data.folders || [];
+                    if (!folders.length) {
+                        publicFolderGrid.innerHTML = '<div class="gallery-empty-state">No folders available right now.</div>';
+                        return;
+                    }
+                    
+                    var cards = folders.map(function (item) {
+                        var isVideo = item.coverType === "video";
+                        var coverMarkup = item.coverPath
+                            ? (isVideo ? '<video src="' + escapeHtml(item.coverPath) + '" muted playsinline preload="metadata"></video>' : '<img src="' + escapeHtml(item.coverPath) + '" alt="cover" loading="lazy">')
+                            : '<span class="gallery-folder-placeholder">No Media</span>';
+                        
+                        var folderLink = "?folder=" + encodeURIComponent(item.name);
+                        
+                        return (
+                            '<a class="gallery-folder-card-public" href="' + folderLink + '" data-public-folder-name="' + escapeHtml(item.name) + '">' +
+                                '<span class="gallery-folder-cover' + (isVideo ? ' gallery-folder-cover-video' : '') + '">' + coverMarkup + '<span class="gallery-folder-cover-title">' + escapeHtml(prettifyName(item.name)) + '</span></span>' +
+                                '<span class="gallery-folder-info">' +
+                                    '<span class="gallery-folder-count">' + item.fileCount + ' item(s)</span>' +
+                                '</span>' +
+                            '</a>'
+                        );
+                    }).join("");
+                    
+                    publicFolderGrid.innerHTML = cards;
+                    
+                    if (currentPublicFolder) {
+                        var exists = folders.some(function(f) { return f.name.toLowerCase() === currentPublicFolder.toLowerCase(); });
+                        if (exists) {
+                            loadPortfolioFiles(currentPublicFolder);
+                        } else {
+                            setPublicViewMode("folders", "");
+                        }
+                    } else {
+                        setPublicViewMode("folders", "");
+                    }
+                })
+                .catch(function(err) {
+                    publicFolderGrid.innerHTML = '<div class="gallery-empty-state">Unable to load folders.</div>';
+                });
+        };
+        
+        if (publicFolderGrid) {
+            loadPortfolioFolders();
+        }
+
+        if (publicFolderGrid) {
+            publicFolderGrid.addEventListener("click", function(e) {
+                var card = e.target.closest(".gallery-folder-card-public");
+                if (card) {
+                    e.preventDefault();
+                    var folderName = card.getAttribute("data-public-folder-name");
+                    var url = new URL(window.location.href);
+                    url.searchParams.set("folder", folderName);
+                    window.history.pushState({}, "", url);
+                    currentPublicFolder = folderName;
+                    loadPortfolioFiles(folderName);
+                }
+            });
+        }
+
+        // Lightbox logic
+        var lightbox = document.querySelector("[data-lightbox]");
+        if (lightbox) {
+            var lightboxContainer = lightbox.querySelector(".gallery-lightbox-media-container");
+            var lightboxTitle = lightbox.querySelector("[data-lightbox-title]");
+            var lightboxMeta = lightbox.querySelector("[data-lightbox-meta]");
+            var lightboxCloses = lightbox.querySelectorAll("[data-lightbox-close]");
+
+            var closeLightbox = function () {
+                lightbox.classList.remove("is-open");
+                lightbox.setAttribute("aria-hidden", "true");
+                document.body.classList.remove("gallery-lightbox-open");
+                if (lightboxContainer) lightboxContainer.innerHTML = "";
+            };
+
+            var openLightbox = function (trigger) {
+                var fullMedia = trigger.dataset.full || "";
+                var title = trigger.dataset.title || "";
+                var meta = trigger.dataset.meta || "";
+                var type = trigger.dataset.type || "image";
+
+                if (lightboxContainer) {
+                    if (type === "video") {
+                        lightboxContainer.innerHTML = '<video src="' + escapeHtml(fullMedia) + '" controls autoplay style="max-width:100%; max-height:80vh; outline:none; border-radius:8px;"></video>';
+                    } else {
+                        lightboxContainer.innerHTML = '<img src="' + escapeHtml(fullMedia) + '" alt="' + escapeHtml(title) + '" data-lightbox-image>';
+                    }
+                }
+                
+                if (lightboxTitle) lightboxTitle.textContent = title;
+                if (lightboxMeta) lightboxMeta.textContent = meta;
+
+                lightbox.classList.add("is-open");
+                lightbox.setAttribute("aria-hidden", "false");
+                document.body.classList.add("gallery-lightbox-open");
+            };
+
+            document.addEventListener("click", function (event) {
+                var trigger = event.target.closest("[data-lightbox-open]");
+                if (trigger) openLightbox(trigger);
+            });
+
+            lightboxCloses.forEach(function (closer) {
+                closer.addEventListener("click", closeLightbox);
+            });
+
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape" && lightbox.classList.contains("is-open")) {
+                    closeLightbox();
+                }
+            });
+        }
+    }
+
     updateNavOffset();
     window.addEventListener("scroll", updateNavOffset, { passive: true });
     window.addEventListener("resize", updateNavOffset);

@@ -1934,7 +1934,7 @@ router.post("/update-banner/:bannerName", adminAuth, function (req, res) {
 });
 
 router.get("/portfolio-folders", adminAuth, async function (req, res) {
-    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
     if (!category) return res.status(400).json({ ok: false, message: "Invalid category." });
     try {
         var folders = await listPortfolioFolders(category);
@@ -1951,6 +1951,42 @@ router.get("/portfolio-folders", adminAuth, async function (req, res) {
         return res.json({ ok: true, folders: cards });
     } catch (error) {
         return res.status(500).json({ ok: false, message: "Unable to load portfolio folders." });
+    }
+});
+
+router.get("/portfolio-folders-public", async function (req, res) {
+    var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
+    if (!category) return res.status(400).json({ ok: false, message: "Invalid category." });
+    try {
+        var folders = await listPortfolioFolders(category);
+        var cards = await Promise.all(folders.map(async function(folder) {
+            var files = await listPortfolioFiles(category, folder);
+            var coverFile = files.length ? files[files.length - 1] : null;
+            return {
+                name: folder,
+                fileCount: files.length,
+                coverPath: coverFile ? coverFile.path : "",
+                coverType: coverFile ? (coverFile.name.toLowerCase().endsWith(".mp4") ? "video" : "image") : ""
+            };
+        }));
+        // Filter out empty folders for public view
+        cards = cards.filter(function (card) { return card.fileCount > 0; });
+        return res.json({ ok: true, folders: cards });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to load portfolio folders." });
+    }
+});
+
+router.get("/portfolio-files-public", async function (req, res) {
+    var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
+    var folderName = normalizeFolderName((req.query && req.query.folder) || getRequestValue(req, "folder"));
+    if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+    
+    try {
+        var files = await listPortfolioFiles(category, folderName);
+        return res.json({ ok: true, folder: folderName, files: files });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to load portfolio files." });
     }
 });
 
@@ -1986,7 +2022,7 @@ router.post("/portfolio-folders", adminAuth, async function (req, res) {
 });
 
 router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, res) {
-    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
     var folderName = normalizeFolderName(req.params.folderName);
     if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
 
@@ -2013,8 +2049,8 @@ router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, 
 });
 
 router.get("/portfolio-files", adminAuth, async function (req, res) {
-    var category = normalizeFolderName(getRequestValue(req, "category"));
-    var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+    var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
+    var folderName = normalizeFolderName((req.query && req.query.folder) || getRequestValue(req, "folder"));
     if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
     
     try {
@@ -2065,8 +2101,8 @@ router.post("/portfolio-files", adminAuth, function (req, res) {
 });
 
 router.delete("/portfolio-files/:fileName", adminAuth, async function (req, res) {
-    var category = normalizeFolderName(getRequestValue(req, "category"));
-    var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+    var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
+    var folderName = normalizeFolderName((req.query && req.query.folder) || getRequestValue(req, "folder"));
     var fileName = String(req.params.fileName || "").trim();
     
     if (!category || !folderName || !fileName || !GALLERY_FILE_REGEX.test(fileName)) {

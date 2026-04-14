@@ -11,8 +11,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="home.css">
     <link rel="stylesheet" href="portfolio-category.css">
+    <link rel="stylesheet" href="gallery.css">
 </head>
-<body class="portfolio-page">
+<body class="portfolio-page" data-portfolio-category="online">
     <div class="page-loader" aria-hidden="true">
         <div class="loader-inner">
             <img src="images/1.png" alt="Rudraksh Creation" class="loader-logo">
@@ -175,42 +176,32 @@
             </div>
         </section>
 
-        <section class="portfolio-content-wrap reveal-on-scroll" aria-label="Category details">
-            <div class="portfolio-layout">
-                <article class="portfolio-panel">
-                    <h2>What We Deliver</h2>
-                    <p>We build online campaign kits aligned with your brand tone, audience, and business goals.</p>
-                    <ul class="portfolio-list">
-                        <li>Social media posts, reels creatives, and ad banners.</li>
-                        <li>Landing-page ready visuals and promo campaign layouts.</li>
-                        <li>Platform-specific content for Meta, YouTube, and Google ecosystems.</li>
-                    </ul>
-                </article>
-
-                <aside class="portfolio-panel portfolio-cta">
-                    <h2>Project Snapshot</h2>
-                    <div class="portfolio-metrics">
-                        <div class="portfolio-metric">
-                            <strong>300+</strong>
-                            <span>Ad creatives</span>
-                        </div>
-                        <div class="portfolio-metric">
-                            <strong>48h</strong>
-                            <span>Rapid concept cycle</span>
-                        </div>
-                        <div class="portfolio-metric">
-                            <strong>Multi</strong>
-                            <span>Platform ready</span>
-                        </div>
-                    </div>
-                    <p>Share your requirement and we will suggest the right design, production, and delivery plan.</p>
-                    <div class="portfolio-actions">
-                        <a class="portfolio-btn portfolio-btn-primary" href="https://wa.me/919814573940" target="_blank" rel="noopener">Start On WhatsApp</a>
-                        <a class="portfolio-btn portfolio-btn-secondary" href="/contact">Contact Team</a>
-                    </div>
-                </aside>
+        <section class="gallery-shell reveal-on-scroll" aria-label="Portfolio showcase">
+            <div class="gallery-browser-head">
+                <h2 data-public-browser-title>Project Folders</h2>
+                <p data-public-browser-subtitle>Open a folder to view our work.</p>
+                <a class="gallery-folder-back-link" data-public-folder-back href="#" hidden>Back to folders</a>
+            </div>
+            <div class="gallery-folder-grid" data-public-folder-grid>
+                <div class="gallery-empty-state">Loading folders...</div>
+            </div>
+            <p class="gallery-selected-folder" data-public-selected-folder hidden>Folder: -</p>
+            <div class="gallery-grid" data-public-image-grid hidden>
+                <div class="gallery-empty-state">No items found.</div>
             </div>
         </section>
+
+        <div class="gallery-lightbox" data-lightbox aria-hidden="true" role="dialog" aria-label="Media preview">
+            <div class="gallery-lightbox-backdrop" data-lightbox-close></div>
+            <div class="gallery-lightbox-panel">
+                <button class="gallery-lightbox-close" type="button" data-lightbox-close aria-label="Close preview">&times;</button>
+                <div class="gallery-lightbox-media-container" style="text-align: center;"></div>
+                <div class="gallery-lightbox-info">
+                    <h4 data-lightbox-title></h4>
+                    <p data-lightbox-meta></p>
+                </div>
+            </div>
+        </div>
 
         <p class="portfolio-note">Need a combined campaign across multiple categories? We can bundle everything in one execution plan.</p>
     </main>
@@ -320,4 +311,3 @@
     <script src="portfolio-category.js"></script>
 </body>
 </html>
-
