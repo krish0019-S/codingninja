@@ -34,9 +34,6 @@ $(function () {
     var deletePortfolioFolderBtn = $("#deletePortfolioFolderBtn");
     var portfolioFolderCardGrid = $("#portfolioFolderCardGrid");
     var portfolioFileGrid = $("#portfolioFileGrid");
-    var portfolioFolderSequenceWrap = $("#portfolioFolderSequenceWrap");
-    var portfolioFolderSequenceSelect = $("#portfolioFolderSequenceSelect");
-    var changePortfolioFolderSequenceBtn = $("#changePortfolioFolderSequenceBtn");
     var newsSection = $("#newsSection");
     var imagesSection = $("#imagesSection");
     var videosSection = $("#videosSection");
@@ -1469,25 +1466,6 @@ $(function () {
         videoFileGrid.html(cards || '<div class="col-12"><div class="banner-empty-state">No videos found in /videos/gallery.</div></div>');
     };
 
-    var setPortfolioFolderSequenceControls = function (folderNames, selectedFolder) {
-        if (!portfolioFolderSequenceWrap.length || !portfolioFolderSequenceSelect.length) {
-            return;
-        }
-
-        var names = Array.isArray(folderNames) ? folderNames.slice() : [];
-        var selected = normalizeFolderName(selectedFolder);
-        var selectedIndex = names.indexOf(selected);
-
-        if (!selected || selectedIndex === -1 || names.length <= 1) {
-            portfolioFolderSequenceWrap.addClass("d-none");
-            portfolioFolderSequenceSelect.html("");
-            return;
-        }
-
-        portfolioFolderSequenceSelect.html(buildSequenceOptions(names.length, selectedIndex + 1));
-        portfolioFolderSequenceWrap.removeClass("d-none");
-    };
-
     var updateActivePortfolioFolderBadge = function () {
         if (!activePortfolioFolderBadge.length) return;
         if (!currentPortfolioFolder) {
@@ -1501,7 +1479,6 @@ $(function () {
         var list = Array.isArray(folders) ? folders : [];
         if (!list.length) {
             currentPortfolioFolderOrder = [];
-            setPortfolioFolderSequenceControls([], "");
             currentPortfolioFolder = "";
             updateActivePortfolioFolderBadge();
             portfolioFolderCardGrid.html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
@@ -1521,7 +1498,6 @@ $(function () {
         if (!normalizedCards.length) {
             currentPortfolioFolder = "";
             currentPortfolioFolderOrder = [];
-            setPortfolioFolderSequenceControls([], "");
             updateActivePortfolioFolderBadge();
             portfolioFolderCardGrid.html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
             return false;
@@ -1536,9 +1512,8 @@ $(function () {
         currentPortfolioFolder = selected;
         currentPortfolioFolderOrder = normalizedCards.map(function(item) { return item.name; });
         updateActivePortfolioFolderBadge();
-        setPortfolioFolderSequenceControls(currentPortfolioFolderOrder, selected);
         
-        var cardsHtml = normalizedCards.map(function (item) {
+        var cardsHtml = normalizedCards.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
             var coverMarkup = '<span class="gallery-folder-placeholder">No Media</span>';
             if (item.coverPath) {
@@ -1549,15 +1524,22 @@ $(function () {
                 }
             }
             
+            var sequenceOptions = buildSequenceOptions(normalizedCards.length, index + 1);
+            
             return (
                 '<div class="col-sm-6 col-md-4 col-xl-3">' +
-                    '<button class="gallery-folder-card gallery-folder-card-portfolio' + activeClass + '" type="button" data-folder-name="' + item.name + '">' +
-                        '<span class="gallery-folder-cover">' + coverMarkup + '</span>' +
-                        '<span class="gallery-folder-info">' +
+                    '<div class="gallery-folder-card gallery-folder-card-portfolio' + activeClass + '" data-folder-name="' + escapeHtml(item.name) + '" style="cursor: pointer; display: flex; flex-direction: column; text-align: left; position: relative;">' +
+                        '<div class="portfolio-folder-sequence" style="position: absolute; top: 10px; right: 10px; z-index: 10;" onclick="event.stopPropagation();">' +
+                            '<select class="form-select form-select-sm portfolio-sequence-select shadow-sm" style="font-size: 13px; padding: 2px 27px 2px 8px; height: 26px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); background-color: rgba(255,255,255,0.95); font-weight: 600;" aria-label="Folder Sequence" title="Change Sequence">' +
+                                sequenceOptions +
+                            '</select>' +
+                        '</div>' +
+                        '<span class="gallery-folder-cover" style="pointer-events: none;">' + coverMarkup + '</span>' +
+                        '<span class="gallery-folder-info" style="pointer-events: none;">' +
                             '<span class="gallery-folder-name">' + escapeHtml(item.name) + '</span>' +
                             '<span class="gallery-folder-count">' + String(item.fileCount) + ' file(s)</span>' +
                         '</span>' +
-                    '</button>' +
+                    '</div>' +
                 '</div>'
             );
         }).join("");
@@ -2858,56 +2840,6 @@ $(function () {
         });
     });
 
-    changePortfolioFolderSequenceBtn.on("click", function () {
-        if (!ensureAuth()) {
-            return;
-        }
-
-        var folderName = normalizeFolderName(currentPortfolioFolder);
-        var sequence = Number(portfolioFolderSequenceSelect.val());
-        var category = portfolioCategorySelect.val() || "printing";
-
-        if (!folderName || !Number.isInteger(sequence) || sequence < 1) {
-            showAlert("Please select a valid folder and sequence.", "danger");
-            return;
-        }
-
-        changePortfolioFolderSequenceBtn.prop("disabled", true);
-
-        $.ajax({
-            url: "/admin/portfolio-folders/reorder",
-            method: "POST",
-            contentType: "application/json",
-            headers: getAuthHeaders(),
-            data: JSON.stringify({ category: category, folderName: folderName, sequence: sequence }),
-            success: function (response) {
-                var selectedFolder = normalizeFolderName(response && response.folderName) || folderName;
-                showAlert(response.message || "Folder sequence updated successfully.", "success");
-
-                var folders = (response && response.folders) || [];
-                var hasFolder = renderPortfolioFolderCards(folders, selectedFolder);
-                if (hasFolder && currentPortfolioFolder) {
-                    loadPortfolioFiles();
-                } else {
-                    renderPortfolioFileEmptyState("No folder selected.");
-                }
-            },
-            error: function (xhr) {
-                if (handleAuthError(xhr)) {
-                    return;
-                }
-                var msg = "Unable to update folder sequence.";
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    msg = xhr.responseJSON.message;
-                }
-                showAlert(msg, "danger");
-            },
-            complete: function () {
-                changePortfolioFolderSequenceBtn.prop("disabled", false);
-            },
-        });
-    });
-
     bannerGrid.on("change", ".banner-file-input", function () {
         var file = this.files && this.files[0];
         if (!file) {
@@ -3444,8 +3376,11 @@ $(function () {
         });
     });
 
-    portfolioFolderCardGrid.on("click", ".gallery-folder-card-portfolio", function () {
-        var selected = normalizeFolderName($(this).data("folderName"));
+    portfolioFolderCardGrid.on("click", ".gallery-folder-card-portfolio", function (e) {
+        if ($(e.target).closest(".portfolio-folder-sequence").length) {
+            return;
+        }
+        var selected = normalizeFolderName($(this).attr("data-folder-name"));
         if (!selected) {
             showAlert("Invalid folder selected.", "danger");
             return;
@@ -3455,6 +3390,50 @@ $(function () {
         $(this).addClass("is-active");
         updateActivePortfolioFolderBadge();
         loadPortfolioFiles();
+    });
+
+    portfolioFolderCardGrid.on("change", ".portfolio-sequence-select", function (e) {
+        e.stopPropagation();
+        if (!ensureAuth()) {
+            return;
+        }
+
+        var card = $(this).closest(".gallery-folder-card-portfolio");
+        var folderName = normalizeFolderName(card.attr("data-folder-name"));
+        var sequence = Number($(this).val());
+        var category = currentPortfolioCategory || "printing";
+
+        if (!folderName || !Number.isInteger(sequence) || sequence < 1) {
+            showAlert("Please select a valid folder and sequence.", "danger");
+            return;
+        }
+
+        var selectEl = $(this);
+        selectEl.prop("disabled", true);
+
+        $.ajax({
+            url: "/admin/portfolio-folders/reorder",
+            method: "POST",
+            contentType: "application/json",
+            headers: getAuthHeaders(),
+            data: JSON.stringify({ category: category, folderName: folderName, sequence: sequence }),
+            success: function (response) {
+                showAlert(response.message || "Folder sequence updated successfully.", "success");
+
+                var folders = (response && response.folders) || [];
+                var hasFolder = renderPortfolioFolderCards(folders, currentPortfolioFolder);
+                if (!hasFolder) {
+                    renderPortfolioFileEmptyState("No folder selected.");
+                }
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = "Unable to update folder sequence.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                showAlert(msg, "danger");
+                selectEl.prop("disabled", false);
+            }
+        });
     });
 
     addPortfolioFilesBtn.on("click", function () {
