@@ -3,16 +3,6 @@
   "paused": false,
   "items": [
     {
-      "id": 5,
-      "title": "Bathinda❤",
-      "content": "haklhgajkdhg\nnkdng;lksf\nnlkfj;gldkf\ndnfkldkggkl;ls\nfdfnl;lf",
-      "contentLink": "",
-      "imageUrl": "/images/gallery/news/logo_no_bg-mmvurpii-34l2bk.png",
-      "createdAt": "2026-03-18T09:42:34.232Z",
-      "updatedAt": "2026-03-18T09:42:34.232Z",
-      "sequence": 1
-    },
-    {
       "id": 3,
       "title": "Hlo",
       "content": "Good MOrning",
@@ -20,7 +10,7 @@
       "imageUrl": "/images/gallery/news/20250304_144401-mm4p7v9v-3g3obw.jpg",
       "createdAt": "2026-02-26T07:14:17.202Z",
       "updatedAt": "2026-02-27T09:37:23.747Z",
-      "sequence": 2
+      "sequence": 1
     },
     {
       "id": 2,
@@ -30,6 +20,16 @@
       "imageUrl": "/news-files/rajasthan_jile_sambhag_2025-mmvx7j28-7mubnx.pdf",
       "createdAt": "2026-02-20T07:31:21.892Z",
       "updatedAt": "2026-03-18T10:50:51.609Z",
+      "sequence": 2
+    },
+    {
+      "id": 5,
+      "title": "Bathinda❤",
+      "content": "haklhgajkdhg\nnkdng;lksf\nnlkfj;gldkf\ndnfkldkggkl;ls\nfdfnl;lf",
+      "contentLink": "",
+      "imageUrl": "/images/gallery/news/logo_no_bg-mmvurpii-34l2bk.png",
+      "createdAt": "2026-03-18T09:42:34.232Z",
+      "updatedAt": "2026-03-18T09:42:34.232Z",
       "sequence": 3
     },
     {

@@ -83,9 +83,6 @@ $(function () {
     var addGalleryImagesInput = $("#addGalleryImagesInput");
     var activeGalleryFolderBadge = $("#activeGalleryFolderBadge");
     var showAllGalleryFoldersBtn = $("#showAllGalleryFoldersBtn");
-    var galleryFolderSequenceWrap = $("#galleryFolderSequenceWrap");
-    var galleryFolderSequenceSelect = $("#galleryFolderSequenceSelect");
-    var changeGalleryFolderSequenceBtn = $("#changeGalleryFolderSequenceBtn");
     var createGalleryFolderBtn = $("#createGalleryFolderBtn");
     var deleteGalleryFolderBtn = $("#deleteGalleryFolderBtn");
     var newGalleryFolderName = $("#newGalleryFolderName");
@@ -94,9 +91,6 @@ $(function () {
     var addGalleryVideosBtn = $("#addGalleryVideosBtn");
     var addGalleryVideosInput = $("#addGalleryVideosInput");
     var activeVideoFolderBadge = $("#activeVideoFolderBadge");
-    var videoFolderSequenceWrap = $("#videoFolderSequenceWrap");
-    var videoFolderSequenceSelect = $("#videoFolderSequenceSelect");
-    var changeVideoFolderSequenceBtn = $("#changeVideoFolderSequenceBtn");
     var createVideoFolderBtn = $("#createVideoFolderBtn");
     var deleteVideoFolderBtn = $("#deleteVideoFolderBtn");
     var newVideoFolderName = $("#newVideoFolderName");
@@ -460,19 +454,11 @@ $(function () {
                 galleryFolderCardGrid.html("");
                 activeGalleryFolderBadge.text("Folder: -");
                 showAllGalleryFoldersBtn.addClass("d-none");
-                if (galleryFolderSequenceWrap.length) {
-                    galleryFolderSequenceWrap.addClass("d-none");
-                }
-                galleryFolderSequenceSelect.html("");
                 renderGalleryImageEmptyState("Login required to manage image folder.");
             } else if (currentView === "videos") {
                 currentVideoFolderOrder = [];
                 videoFolderCardGrid.html("");
                 activeVideoFolderBadge.text("Folder: -");
-                if (videoFolderSequenceWrap.length) {
-                    videoFolderSequenceWrap.addClass("d-none");
-                }
-                videoFolderSequenceSelect.html("");
                 renderVideoFileEmptyState("Login required to manage video folder.");
             } else {
                 renderEmptyState("Login required to manage carousel slides.");
@@ -510,22 +496,18 @@ $(function () {
         return (
             '<div class="col-md-6 col-xl-4">' +
                 '<div class="banner-card" data-banner="' + name + '">' +
-                    '<div class="banner-preview">' +
+                    '<div class="banner-preview" style="position: relative;">' +
+                        '<div class="banner-sequence" style="position: absolute; top: 10px; right: 10px; z-index: 10;">' +
+                            '<select class="form-select form-select-sm banner-sequence-select shadow-sm" style="font-size: 13px; padding: 2px 27px 2px 8px; height: 26px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); background-color: rgba(255,255,255,0.95); font-weight: 600;" aria-label="Banner Sequence" title="Change Sequence">' +
+                                sequenceOptions +
+                            '</select>' +
+                        '</div>' +
                         '<img src="' + previewUrl + '" alt="' + title + '">' +
                         "<span>" + title + "</span>" +
                     "</div>" +
                     '<div class="banner-form">' +
                         '<input class="form-control banner-file-input" type="file" accept="image/jpeg,image/png">' +
-                        '<div class="sequence-row">' +
-                            '<label class="form-label mb-1">Sequence</label>' +
-                            '<div class="sequence-controls">' +
-                                '<select class="form-select form-select-sm banner-sequence-select">' +
-                                    sequenceOptions +
-                                "</select>" +
-                                '<button class="btn btn-outline-secondary btn-sm btn-sequence" type="button">Change Sequence</button>' +
-                            "</div>" +
-                        "</div>" +
-                        '<div class="banner-actions">' +
+                        '<div class="banner-actions mt-3">' +
                             '<button class="btn btn-primary btn-update" type="button">Update</button>' +
                             '<button class="btn btn-outline-danger btn-remove" type="button">Remove</button>' +
                         "</div>" +
@@ -947,10 +929,9 @@ $(function () {
                     '<div class="news-item-col news-item-col-actions" data-label="Order/Action">' +
                         '<div class="news-item-actions">' +
                             '<div class="news-sequence-controls">' +
-                                '<select class="form-select form-select-sm news-sequence-select">' +
+                                '<select class="form-select form-select-sm news-sequence-select" data-news-id="' + String(newsId) + '">' +
                                     sequenceOptions +
                                 "</select>" +
-                                '<button class="btn btn-outline-secondary btn-sm btn-news-sequence" type="button" data-news-id="' + String(newsId) + '">Change</button>' +
                             "</div>" +
                             '<div class="news-action-buttons">' +
                                 '<button class="btn btn-outline-primary btn-sm btn-news-edit" type="button" data-news-id="' + String(newsId) + '">Edit</button>' +
@@ -1050,25 +1031,6 @@ $(function () {
         activeGalleryFolderBadge.text("Folder: " + currentGalleryFolder);
     };
 
-    var setGalleryFolderSequenceControls = function (folderNames, selectedFolder) {
-        if (!galleryFolderSequenceWrap.length || !galleryFolderSequenceSelect.length) {
-            return;
-        }
-
-        var names = Array.isArray(folderNames) ? folderNames.slice() : [];
-        var selected = normalizeFolderName(selectedFolder);
-        var selectedIndex = names.indexOf(selected);
-
-        if (!selected || selectedIndex === -1 || names.length <= 1) {
-            galleryFolderSequenceWrap.addClass("d-none");
-            galleryFolderSequenceSelect.html("");
-            return;
-        }
-
-        galleryFolderSequenceSelect.html(buildSequenceOptions(names.length, selectedIndex + 1));
-        galleryFolderSequenceWrap.removeClass("d-none");
-    };
-
     var renderGalleryFolderCards = function (folders, preferredFolder) {
         var list = Array.isArray(folders) ? folders : [];
         if (!list.length) {
@@ -1076,7 +1038,6 @@ $(function () {
             showOnlySelectedGalleryFolder = false;
             currentGalleryFolderOrder = [];
             updateActiveGalleryFolderBadge();
-            setGalleryFolderSequenceControls([], "");
             if (showAllGalleryFoldersBtn.length) {
                 showAllGalleryFoldersBtn.addClass("d-none");
             }
@@ -1102,7 +1063,6 @@ $(function () {
             showOnlySelectedGalleryFolder = false;
             currentGalleryFolderOrder = [];
             updateActiveGalleryFolderBadge();
-            setGalleryFolderSequenceControls([], "");
             if (showAllGalleryFoldersBtn.length) {
                 showAllGalleryFoldersBtn.addClass("d-none");
             }
@@ -1125,7 +1085,6 @@ $(function () {
         });
         currentGalleryFolder = selected;
         updateActiveGalleryFolderBadge();
-        setGalleryFolderSequenceControls(currentGalleryFolderOrder, selected);
 
         var cardsToRender = normalizedCards;
         if (showOnlySelectedGalleryFolder && selected) {
@@ -1144,21 +1103,29 @@ $(function () {
             showAllGalleryFoldersBtn.toggleClass("d-none", !(showOnlySelectedGalleryFolder && Boolean(selected)));
         }
 
-        var cardsHtml = cardsToRender.map(function (item) {
+        var cardsHtml = cardsToRender.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
             var coverMarkup = item.coverPath
                 ? '<img src="' + item.coverPath + '" alt="' + escapeHtml(item.name) + ' cover">'
                 : '<span class="gallery-folder-placeholder">No Image</span>';
 
+            var originalIndex = normalizedCards.findIndex(function(c) { return c.name === item.name; });
+            var sequenceOptions = buildSequenceOptions(normalizedCards.length, originalIndex + 1);
+
             return (
                 '<div class="col-sm-6 col-md-4 col-xl-3">' +
-                    '<button class="gallery-folder-card' + activeClass + '" type="button" data-folder-name="' + item.name + '">' +
-                        '<span class="gallery-folder-cover">' + coverMarkup + "</span>" +
-                        '<span class="gallery-folder-info">' +
+                    '<div class="gallery-folder-card' + activeClass + '" data-folder-name="' + escapeHtml(item.name) + '" style="cursor: pointer; display: flex; flex-direction: column; text-align: left; position: relative;">' +
+                        '<div class="gallery-folder-sequence" style="position: absolute; top: 10px; right: 10px; z-index: 10;" onclick="event.stopPropagation();">' +
+                            '<select class="form-select form-select-sm gallery-sequence-select shadow-sm" style="font-size: 13px; padding: 2px 27px 2px 8px; height: 26px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); background-color: rgba(255,255,255,0.95); font-weight: 600;" aria-label="Folder Sequence" title="Change Sequence">' +
+                                sequenceOptions +
+                            '</select>' +
+                        '</div>' +
+                        '<span class="gallery-folder-cover" style="pointer-events: none;">' + coverMarkup + "</span>" +
+                        '<span class="gallery-folder-info" style="pointer-events: none;">' +
                             '<span class="gallery-folder-name">' + escapeHtml(item.name) + "</span>" +
                             '<span class="gallery-folder-count">' + String(item.imageCount) + " image(s)</span>" +
                         "</span>" +
-                    "</button>" +
+                    "</div>" +
                 "</div>"
             );
         }).join("");
@@ -1170,7 +1137,6 @@ $(function () {
     var loadGalleryFolderCards = function (preferredFolder) {
         if (!tokenValid()) {
             currentGalleryFolderOrder = [];
-            setGalleryFolderSequenceControls([], "");
             renderGalleryImageEmptyState("Login required to manage image folder.");
             return;
         }
@@ -1202,7 +1168,6 @@ $(function () {
                     '<div class="col-12"><div class="banner-empty-state">' + escapeHtml(msg) + "</div></div>"
                 );
                 currentGalleryFolderOrder = [];
-                setGalleryFolderSequenceControls([], "");
                 renderGalleryImageEmptyState(msg);
             },
         });
@@ -1297,32 +1262,12 @@ $(function () {
         activeVideoFolderBadge.text("Folder: " + currentVideoFolder);
     };
 
-    var setVideoFolderSequenceControls = function (folderNames, selectedFolder) {
-        if (!videoFolderSequenceWrap.length || !videoFolderSequenceSelect.length) {
-            return;
-        }
-
-        var names = Array.isArray(folderNames) ? folderNames.slice() : [];
-        var selected = normalizeFolderName(selectedFolder);
-        var selectedIndex = names.indexOf(selected);
-
-        if (!selected || selectedIndex === -1 || names.length <= 1) {
-            videoFolderSequenceWrap.addClass("d-none");
-            videoFolderSequenceSelect.html("");
-            return;
-        }
-
-        videoFolderSequenceSelect.html(buildSequenceOptions(names.length, selectedIndex + 1));
-        videoFolderSequenceWrap.removeClass("d-none");
-    };
-
     var renderVideoFolderCards = function (folders, preferredFolder) {
         var list = Array.isArray(folders) ? folders : [];
         if (!list.length) {
             currentVideoFolder = "";
             currentVideoFolderOrder = [];
             updateActiveVideoFolderBadge();
-            setVideoFolderSequenceControls([], "");
             videoFolderCardGrid.html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
@@ -1344,7 +1289,6 @@ $(function () {
             currentVideoFolder = "";
             currentVideoFolderOrder = [];
             updateActiveVideoFolderBadge();
-            setVideoFolderSequenceControls([], "");
             videoFolderCardGrid.html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
@@ -1364,23 +1308,30 @@ $(function () {
             return item.name;
         });
         updateActiveVideoFolderBadge();
-        setVideoFolderSequenceControls(currentVideoFolderOrder, selected);
 
-        var cardsHtml = normalizedCards.map(function (item) {
+        var cardsHtml = normalizedCards.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
             var coverMarkup = item.coverPath
                 ? '<video src="' + item.coverPath + '" muted playsinline preload="metadata"></video>'
                 : '<span class="gallery-folder-placeholder">No Video</span>';
 
+            var originalIndex = normalizedCards.findIndex(function(c) { return c.name === item.name; });
+            var sequenceOptions = buildSequenceOptions(normalizedCards.length, originalIndex + 1);
+
             return (
                 '<div class="col-sm-6 col-md-4 col-xl-3">' +
-                    '<button class="gallery-folder-card gallery-folder-card-video' + activeClass + '" type="button" data-folder-name="' + item.name + '">' +
-                        '<span class="gallery-folder-cover gallery-folder-cover-video">' + coverMarkup + "</span>" +
-                        '<span class="gallery-folder-info">' +
+                    '<div class="gallery-folder-card gallery-folder-card-video' + activeClass + '" data-folder-name="' + escapeHtml(item.name) + '" style="cursor: pointer; display: flex; flex-direction: column; text-align: left; position: relative;">' +
+                        '<div class="video-folder-sequence" style="position: absolute; top: 10px; right: 10px; z-index: 10;" onclick="event.stopPropagation();">' +
+                            '<select class="form-select form-select-sm video-sequence-select shadow-sm" style="font-size: 13px; padding: 2px 27px 2px 8px; height: 26px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); background-color: rgba(255,255,255,0.95); font-weight: 600;" aria-label="Folder Sequence" title="Change Sequence">' +
+                                sequenceOptions +
+                            '</select>' +
+                        '</div>' +
+                        '<span class="gallery-folder-cover gallery-folder-cover-video" style="pointer-events: none;">' + coverMarkup + "</span>" +
+                        '<span class="gallery-folder-info" style="pointer-events: none;">' +
                             '<span class="gallery-folder-name">' + escapeHtml(item.name) + "</span>" +
                             '<span class="gallery-folder-count">' + String(item.videoCount) + " video(s)</span>" +
                         "</span>" +
-                    "</button>" +
+                    "</div>" +
                 "</div>"
             );
         }).join("");
@@ -1392,7 +1343,6 @@ $(function () {
     var loadVideoFolderCards = function (preferredFolder) {
         if (!tokenValid()) {
             currentVideoFolderOrder = [];
-            setVideoFolderSequenceControls([], "");
             renderVideoFileEmptyState("Login required to manage video folder.");
             return;
         }
@@ -1424,7 +1374,6 @@ $(function () {
                     '<div class="col-12"><div class="banner-empty-state">' + escapeHtml(msg) + "</div></div>"
                 );
                 currentVideoFolderOrder = [];
-                setVideoFolderSequenceControls([], "");
                 renderVideoFileEmptyState(msg);
             },
         });
@@ -2452,8 +2401,11 @@ $(function () {
         });
     });
 
-    galleryFolderCardGrid.on("click", ".gallery-folder-card", function () {
-        var selected = normalizeFolderName($(this).data("folderName"));
+    galleryFolderCardGrid.on("click", ".gallery-folder-card", function (e) {
+        if ($(e.target).closest(".gallery-folder-sequence").length) {
+            return;
+        }
+        var selected = normalizeFolderName($(this).attr("data-folder-name"));
         if (!selected) {
             showAlert("Invalid folder selected.", "danger");
             return;
@@ -2463,25 +2415,23 @@ $(function () {
         loadGalleryFolderCards(currentGalleryFolder);
     });
 
-    showAllGalleryFoldersBtn.on("click", function () {
-        showOnlySelectedGalleryFolder = false;
-        loadGalleryFolderCards(currentGalleryFolder);
-    });
-
-    changeGalleryFolderSequenceBtn.on("click", function () {
+    galleryFolderCardGrid.on("change", ".gallery-sequence-select", function (e) {
+        e.stopPropagation();
         if (!ensureAuth()) {
             return;
         }
 
-        var folderName = normalizeFolderName(currentGalleryFolder);
-        var sequence = Number(galleryFolderSequenceSelect.val());
+        var card = $(this).closest(".gallery-folder-card");
+        var folderName = normalizeFolderName(card.attr("data-folder-name"));
+        var sequence = Number($(this).val());
 
         if (!folderName || !Number.isInteger(sequence) || sequence < 1) {
             showAlert("Please select a valid folder and sequence.", "danger");
             return;
         }
 
-        changeGalleryFolderSequenceBtn.prop("disabled", true);
+        var selectEl = $(this);
+        selectEl.prop("disabled", true);
 
         $.ajax({
             url: "/admin/gallery-folders/reorder",
@@ -2503,69 +2453,18 @@ $(function () {
                 }
             },
             error: function (xhr) {
-                if (handleAuthError(xhr)) {
-                    return;
-                }
+                if (handleAuthError(xhr)) return;
                 var msg = "Unable to update folder sequence.";
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    msg = xhr.responseJSON.message;
-                }
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
                 showAlert(msg, "danger");
-            },
-            complete: function () {
-                changeGalleryFolderSequenceBtn.prop("disabled", false);
-            },
+                selectEl.prop("disabled", false);
+            }
         });
     });
 
-    changeVideoFolderSequenceBtn.on("click", function () {
-        if (!ensureAuth()) {
-            return;
-        }
-
-        var folderName = normalizeFolderName(currentVideoFolder);
-        var sequence = Number(videoFolderSequenceSelect.val());
-
-        if (!folderName || !Number.isInteger(sequence) || sequence < 1) {
-            showAlert("Please select a valid folder and sequence.", "danger");
-            return;
-        }
-
-        changeVideoFolderSequenceBtn.prop("disabled", true);
-
-        $.ajax({
-            url: "/admin/video-folders/reorder",
-            method: "POST",
-            contentType: "application/json",
-            headers: getAuthHeaders(),
-            data: JSON.stringify({ folderName: folderName, sequence: sequence }),
-            success: function (response) {
-                var selectedFolder = normalizeFolderName(response && response.folderName) || folderName;
-                currentVideoFolder = selectedFolder;
-                showAlert(response.message || "Video folder sequence updated successfully.", "success");
-
-                var cards = (response && response.cards) || [];
-                var hasFolder = renderVideoFolderCards(cards, selectedFolder);
-                if (hasFolder && currentVideoFolder) {
-                    loadVideoFiles();
-                } else {
-                    renderVideoFileEmptyState("No folder selected.");
-                }
-            },
-            error: function (xhr) {
-                if (handleAuthError(xhr)) {
-                    return;
-                }
-                var msg = "Unable to update video folder sequence.";
-                if (xhr.responseJSON && xhr.responseJSON.message) {
-                    msg = xhr.responseJSON.message;
-                }
-                showAlert(msg, "danger");
-            },
-            complete: function () {
-                changeVideoFolderSequenceBtn.prop("disabled", false);
-            },
-        });
+    showAllGalleryFoldersBtn.on("click", function () {
+        showOnlySelectedGalleryFolder = false;
+        loadGalleryFolderCards(currentGalleryFolder);
     });
 
     addGalleryVideosBtn.on("click", function () {
@@ -2626,8 +2525,11 @@ $(function () {
         });
     });
 
-    videoFolderCardGrid.on("click", ".gallery-folder-card-video", function () {
-        var selected = normalizeFolderName($(this).data("folderName"));
+    videoFolderCardGrid.on("click", ".gallery-folder-card-video", function (e) {
+        if ($(e.target).closest(".video-folder-sequence").length) {
+            return;
+        }
+        var selected = normalizeFolderName($(this).attr("data-folder-name"));
         if (!selected) {
             showAlert("Invalid folder selected.", "danger");
             return;
@@ -2636,8 +2538,54 @@ $(function () {
         videoFolderCardGrid.find(".gallery-folder-card-video").removeClass("is-active");
         $(this).addClass("is-active");
         updateActiveVideoFolderBadge();
-        setVideoFolderSequenceControls(currentVideoFolderOrder, selected);
         loadVideoFiles();
+    });
+
+    videoFolderCardGrid.on("change", ".video-sequence-select", function (e) {
+        e.stopPropagation();
+        if (!ensureAuth()) {
+            return;
+        }
+
+        var card = $(this).closest(".gallery-folder-card-video");
+        var folderName = normalizeFolderName(card.attr("data-folder-name"));
+        var sequence = Number($(this).val());
+
+        if (!folderName || !Number.isInteger(sequence) || sequence < 1) {
+            showAlert("Please select a valid folder and sequence.", "danger");
+            return;
+        }
+
+        var selectEl = $(this);
+        selectEl.prop("disabled", true);
+
+        $.ajax({
+            url: "/admin/video-folders/reorder",
+            method: "POST",
+            contentType: "application/json",
+            headers: getAuthHeaders(),
+            data: JSON.stringify({ folderName: folderName, sequence: sequence }),
+            success: function (response) {
+                var selectedFolder = normalizeFolderName(response && response.folderName) || folderName;
+                currentVideoFolder = selectedFolder;
+                showAlert(response.message || "Video folder sequence updated successfully.", "success");
+
+                var cards = (response && response.cards) || [];
+                var hasFolder = renderVideoFolderCards(cards, selectedFolder);
+                if (hasFolder && currentVideoFolder) {
+                    loadVideoFiles();
+                } else {
+                    renderVideoFileEmptyState("No folder selected.");
+                }
+            },
+            error: function (xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = "Unable to update video folder sequence.";
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                showAlert(msg, "danger");
+                selectEl.prop("disabled", false);
+            }
+        });
     });
 
     var createFolderAction = function () {
@@ -2903,19 +2851,22 @@ $(function () {
         });
     });
 
-    bannerGrid.on("click", ".btn-sequence", function () {
+    bannerGrid.on("change", ".banner-sequence-select", function () {
         if (!ensureAuth()) {
             return;
         }
 
         var card = $(this).closest(".banner-card");
         var bannerName = String(card.data("banner") || "");
-        var sequence = Number(card.find(".banner-sequence-select").val());
+        var sequence = Number($(this).val());
 
         if (!bannerName || !Number.isInteger(sequence) || sequence < 1) {
             showAlert("Please select a valid sequence number.", "danger");
             return;
         }
+
+        var selectEl = $(this);
+        selectEl.prop("disabled", true);
 
         $.ajax({
             url: "/admin/carousel/reorder",
@@ -2936,6 +2887,7 @@ $(function () {
                     msg = xhr.responseJSON.message;
                 }
                 showAlert(msg, "danger");
+                selectEl.prop("disabled", false);
             },
         });
     });
@@ -3161,15 +3113,14 @@ $(function () {
             });
     });
 
-    newsListWrap.on("click", ".btn-news-sequence", function () {
+    newsListWrap.on("change", ".news-sequence-select", function () {
         if (!ensureAuth()) {
             return;
         }
 
-        var button = $(this);
-        var card = button.closest(".news-item-card");
-        var newsId = Number(button.data("newsId") || card.data("newsId"));
-        var sequence = Number(card.find(".news-sequence-select").val());
+        var selectEl = $(this);
+        var newsId = Number(selectEl.data("newsId"));
+        var sequence = Number(selectEl.val());
 
         if (!Number.isInteger(newsId) || newsId <= 0) {
             showAlert("Invalid news id.", "danger");
@@ -3180,7 +3131,7 @@ $(function () {
             return;
         }
 
-        button.prop("disabled", true);
+        selectEl.prop("disabled", true);
 
         $.ajax({
             url: "/admin/news-items/reorder",
@@ -3200,19 +3151,13 @@ $(function () {
                 }
             },
             error: function (xhr) {
-                if (handleAuthError(xhr)) {
-                    button.prop("disabled", false);
-                    return;
-                }
+                if (handleAuthError(xhr)) return;
                 var msg = "Unable to update news sequence.";
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     msg = xhr.responseJSON.message;
                 }
                 showAlert(msg, "danger");
-                button.prop("disabled", false);
-            },
-            complete: function () {
-                button.prop("disabled", false);
+                selectEl.prop("disabled", false);
             },
         });
     });
@@ -3672,16 +3617,8 @@ $(function () {
         newsScrollPaused = false;
         activeGalleryFolderBadge.text("Folder: -");
         showAllGalleryFoldersBtn.addClass("d-none");
-        if (galleryFolderSequenceWrap.length) {
-            galleryFolderSequenceWrap.addClass("d-none");
-        }
-        galleryFolderSequenceSelect.html("");
         galleryFolderCardGrid.html("");
         activeVideoFolderBadge.text("Folder: -");
-        if (videoFolderSequenceWrap.length) {
-            videoFolderSequenceWrap.addClass("d-none");
-        }
-        videoFolderSequenceSelect.html("");
         videoFolderCardGrid.html("");
         newGalleryFolderName.val("");
         newVideoFolderName.val("");
