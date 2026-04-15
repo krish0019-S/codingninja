@@ -2540,7 +2540,6 @@ $(function () {
         updateActiveVideoFolderBadge();
         loadVideoFiles();
     });
-
     videoFolderCardGrid.on("change", ".video-sequence-select", function (e) {
         e.stopPropagation();
         if (!ensureAuth()) {
@@ -3336,7 +3335,6 @@ $(function () {
         updateActivePortfolioFolderBadge();
         loadPortfolioFiles();
     });
-
     portfolioFolderCardGrid.on("change", ".portfolio-sequence-select", function (e) {
         e.stopPropagation();
         if (!ensureAuth()) {
