@@ -78,6 +78,143 @@ var getPortfolioFolderDir = function (category, folderName) {
     return folderDir;
 };
 
+var getPortfolioOrderFile = function(category) {
+    var normCat = normalizeFolderName(category);
+    if (!normCat) return null;
+    return path.join(__dirname, "..", "data", "portfolio-order-" + normCat + ".json");
+};
+
+var readPortfolioFolderOrder = async function (category) {
+    var orderFile = getPortfolioOrderFile(category);
+    if (!orderFile) return [];
+    try {
+        var raw = await fs.promises.readFile(orderFile, "utf8");
+        var parsed = JSON.parse(raw);
+        var list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed && parsed.order) ? parsed.order : []);
+        var seen = new Set();
+        var normalized = [];
+
+        list.forEach(function (name) {
+            var folderName = normalizeFolderName(name);
+            var key = folderKey(folderName);
+            if (folderName && !seen.has(key)) {
+                seen.add(key);
+                normalized.push(folderName);
+            }
+        });
+
+        return normalized;
+    } catch (error) {
+        if (error && error.code === "ENOENT") {
+            return [];
+        }
+        console.error(error);
+        return [];
+    }
+};
+
+var writePortfolioFolderOrder = async function (category, order) {
+    var orderFile = getPortfolioOrderFile(category);
+    if (!orderFile) throw new Error("Invalid category.");
+
+    var source = Array.isArray(order) ? order : [];
+    var seen = new Set();
+    var normalized = [];
+
+    source.forEach(function (name) {
+        var folderName = normalizeFolderName(name);
+        var key = folderKey(folderName);
+        if (folderName && !seen.has(key)) {
+            seen.add(key);
+            normalized.push(folderName);
+        }
+    });
+
+    await fs.promises.mkdir(path.dirname(orderFile), { recursive: true });
+    await fs.promises.writeFile(
+        orderFile,
+        JSON.stringify({ order: normalized }, null, 2),
+        "utf8"
+    );
+    return normalized;
+};
+
+var syncPortfolioFolderOrder = async function (category, folders) {
+    var physicalFolders = Array.isArray(folders) ? folders.slice() : [];
+    var physicalMap = buildFolderMap(physicalFolders);
+    var currentOrder = await readPortfolioFolderOrder(category);
+    var merged = [];
+    var used = new Set();
+
+    currentOrder.forEach(function (name) {
+        var normalized = normalizeFolderName(name);
+        var key = folderKey(normalized);
+        if (physicalMap.has(key) && !used.has(key)) {
+            merged.push(physicalMap.get(key));
+            used.add(key);
+        }
+    });
+
+    physicalMap.forEach(function (value, key) {
+        if (!used.has(key)) {
+            merged.push(value);
+            used.add(key);
+        }
+    });
+
+    var changed =
+        merged.length !== currentOrder.length ||
+        merged.some(function (name, index) {
+            return folderKey(currentOrder[index]) !== folderKey(name);
+        });
+
+    if (changed) {
+        await writePortfolioFolderOrder(category, merged);
+    }
+
+    return merged;
+};
+
+var listPortfolioFoldersOrdered = async function (category) {
+    var folders = await listPortfolioFolders(category);
+    return syncPortfolioFolderOrder(category, folders);
+};
+
+var reorderPortfolioFolderSequence = async function (category, folderName, targetSequence) {
+    var normalizedName = normalizeFolderName(folderName);
+    if (!normalizedName) {
+        throw new Error("Invalid folder name.");
+    }
+    if (!Number.isInteger(targetSequence) || targetSequence < 1) {
+        throw new Error("Invalid sequence.");
+    }
+
+    var physicalFolders = await listPortfolioFolders(category);
+    var physicalMap = buildFolderMap(physicalFolders);
+    var key = folderKey(normalizedName);
+    if (!physicalMap.has(key)) {
+        throw new Error("Folder not found.");
+    }
+
+    var orderedFolders = await syncPortfolioFolderOrder(category, physicalFolders);
+    var currentIndex = orderedFolders.findIndex(function (name) {
+        return folderKey(name) === key;
+    });
+    if (currentIndex === -1) {
+        throw new Error("Folder not found.");
+    }
+
+    var clampedIndex = Math.max(0, Math.min(targetSequence - 1, orderedFolders.length - 1));
+    if (currentIndex !== clampedIndex) {
+        var actualName = physicalMap.get(key);
+        orderedFolders.splice(currentIndex, 1);
+        orderedFolders.splice(clampedIndex, 0, actualName);
+        await writePortfolioFolderOrder(category, orderedFolders);
+    }
+
+    return orderedFolders;
+};
+
 var listPortfolioFolders = async function (category) {
     var normCat = normalizeFolderName(category);
     if (!normCat) return [];
@@ -764,7 +901,7 @@ if (!process.env.SMTP_SECURE && smtpPort === 465) {
     smtpSecure = true;
 }
 var smtpUser = process.env.SMTP_USER || "krishtanwar153@gmail.com";
-var smtpPass = process.env.SMTP_PASS || "ukua hfny wbxy orsr";
+var smtpPass = process.env.SMTP_PASS || "dgut tplg plco zlno";
 smtpPass = String(smtpPass || "").replace(/\s+/g, "");
 
 var transporterConfig = smtpHost
@@ -1771,15 +1908,21 @@ router.post("/forgot-password", async function (req, res) {
                 });
             })
             .catch(function (error) {
-                console.error(error);
+                console.error("Error sending password reset email:", error);
                 resetStore.delete(resetKey);
+                var errorMessage = "Unable to send reset email. Please try again.";
+                if (error && error.code === 'EAUTH') {
+                    errorMessage = "Email server authentication failed. Check SMTP credentials.";
+                } else if (error && error.code === 'ECONNECTION') {
+                    errorMessage = "Could not connect to email server. Check SMTP host/port.";
+                }
                 return res.status(500).json({
                     ok: false,
-                    message: "Unable to send reset email. Please try again.",
+                    message: errorMessage,
                 });
             });
     } catch (error) {
-        console.error(error);
+        console.error("Error in forgot-password route:", error);
         return res.status(500).json({ ok: false, message: "Unable to send reset email." });
     }
 });
@@ -1937,7 +2080,7 @@ router.get("/portfolio-folders", adminAuth, async function (req, res) {
     var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
     if (!category) return res.status(400).json({ ok: false, message: "Invalid category." });
     try {
-        var folders = await listPortfolioFolders(category);
+        var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
             var files = await listPortfolioFiles(category, folder);
             var coverFile = files.length ? files[files.length - 1] : null;
@@ -1958,7 +2101,7 @@ router.get("/portfolio-folders-public", async function (req, res) {
     var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
     if (!category) return res.status(400).json({ ok: false, message: "Invalid category." });
     try {
-        var folders = await listPortfolioFolders(category);
+        var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
             var files = await listPortfolioFiles(category, folder);
             var coverFile = files.length ? files[files.length - 1] : null;
@@ -2003,8 +2146,12 @@ router.post("/portfolio-folders", adminAuth, async function (req, res) {
         }
         var folderDir = getPortfolioFolderDir(category, folderName);
         await fs.promises.mkdir(folderDir, { recursive: true });
-        
-        var folders = await listPortfolioFolders(category);
+
+        var order = await readPortfolioFolderOrder(category);
+        order.unshift(folderName);
+        await writePortfolioFolderOrder(category, order);
+
+        var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
             var files = await listPortfolioFiles(category, folder);
             var coverFile = files.length ? files[files.length - 1] : null;
@@ -2031,7 +2178,7 @@ router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, 
         if (!folderDir) return res.status(400).json({ ok: false, message: "Invalid folder name." });
         await fs.promises.rm(folderDir, { recursive: true, force: false });
         
-        var folders = await listPortfolioFolders(category);
+        var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
             var files = await listPortfolioFiles(category, folder);
             var coverFile = files.length ? files[files.length - 1] : null;
