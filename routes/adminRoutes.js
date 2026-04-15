@@ -2168,6 +2168,55 @@ router.post("/portfolio-folders", adminAuth, async function (req, res) {
     }
 });
 
+router.post("/portfolio-folders/reorder", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(getRequestValue(req, "folderName"));
+    var sequence = Number(getRequestValue(req, "sequence"));
+
+    if (!category) {
+        return res.status(400).json({ ok: false, message: "Invalid category." });
+    }
+    if (!folderName) {
+        return res.status(400).json({ ok: false, message: "Invalid folder name." });
+    }
+    if (!Number.isInteger(sequence) || sequence < 1) {
+        return res.status(400).json({ ok: false, message: "Invalid sequence." });
+    }
+
+    try {
+        await reorderPortfolioFolderSequence(category, folderName, sequence);
+
+        var folders = await listPortfolioFoldersOrdered(category);
+        var cards = await Promise.all(folders.map(async function(folder) {
+            var files = await listPortfolioFiles(category, folder);
+            var coverFile = files.length ? files[files.length - 1] : null;
+            return {
+                name: folder,
+                fileCount: files.length,
+                coverPath: coverFile ? coverFile.path : "",
+                coverType: coverFile ? (coverFile.name.toLowerCase().endsWith(".mp4") ? "video" : "image") : ""
+            };
+        }));
+
+        return res.json({
+            ok: true,
+            message: "Portfolio folder sequence updated successfully.",
+            folderName: folderName,
+            folders: cards,
+        });
+    } catch (error) {
+        if (error && (error.message === "Invalid folder name." || error.message === "Invalid sequence.")) {
+            return res.status(400).json({ ok: false, message: error.message });
+        }
+        if (error && error.message === "Folder not found.") {
+            return res.status(404).json({ ok: false, message: "Folder not found." });
+        }
+
+        console.error(error);
+        return res.status(500).json({ ok: false, message: "Unable to reorder portfolio folders." });
+    }
+});
+
 router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, res) {
     var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
     var folderName = normalizeFolderName(req.params.folderName);
