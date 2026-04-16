@@ -1043,7 +1043,7 @@ $(function () {
             if (showAllGalleryFoldersBtn.length) {
                 showAllGalleryFoldersBtn.addClass("d-none");
             }
-            galleryFolderCardGrid.html(
+            galleryFolderCardGrid.removeClass("d-none").html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
             return false;
@@ -1068,7 +1068,7 @@ $(function () {
             if (showAllGalleryFoldersBtn.length) {
                 showAllGalleryFoldersBtn.addClass("d-none");
             }
-            galleryFolderCardGrid.html(
+            galleryFolderCardGrid.removeClass("d-none").html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
             return false;
@@ -1104,6 +1104,7 @@ $(function () {
         if (showAllGalleryFoldersBtn.length) {
             showAllGalleryFoldersBtn.toggleClass("d-none", !(showOnlySelectedGalleryFolder && Boolean(selected)));
         }
+        galleryFolderCardGrid.toggleClass("d-none", showOnlySelectedGalleryFolder && Boolean(selected));
 
         var cardsHtml = cardsToRender.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
@@ -1432,7 +1433,7 @@ $(function () {
             currentPortfolioFolderOrder = [];
             currentPortfolioFolder = "";
             updateActivePortfolioFolderBadge();
-            portfolioFolderCardGrid.html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
+            portfolioFolderCardGrid.removeClass("d-none").html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
             return false;
         }
         
@@ -1450,7 +1451,7 @@ $(function () {
             currentPortfolioFolder = "";
             currentPortfolioFolderOrder = [];
             updateActivePortfolioFolderBadge();
-            portfolioFolderCardGrid.html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
+            portfolioFolderCardGrid.removeClass("d-none").html('<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>');
             return false;
         }
         
@@ -1480,6 +1481,7 @@ $(function () {
         if (showAllPortfolioFoldersBtn.length) {
             showAllPortfolioFoldersBtn.toggleClass("d-none", !(showOnlySelectedPortfolioFolder && Boolean(selected)));
         }
+        portfolioFolderCardGrid.toggleClass("d-none", showOnlySelectedPortfolioFolder && Boolean(selected));
         
         var cardsHtml = cardsToRender.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
@@ -3639,7 +3641,10 @@ $(function () {
         newsScrollPaused = false;
         activeGalleryFolderBadge.text("Folder: -");
         showAllGalleryFoldersBtn.addClass("d-none");
-        galleryFolderCardGrid.html("");
+        galleryFolderCardGrid.removeClass("d-none").html("");
+        if (portfolioFolderCardGrid.length) {
+            portfolioFolderCardGrid.removeClass("d-none").html("");
+        }
         activeVideoFolderBadge.text("Folder: -");
         videoFolderCardGrid.html("");
         newGalleryFolderName.val("");
