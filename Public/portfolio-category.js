@@ -419,9 +419,17 @@
 
                 if (lightboxContainer) {
                     if (isVideo) {
-                        lightboxContainer.innerHTML = '<video src="' + escapeHtml(filePath) + '" controls autoplay style="max-width:100%; max-height:80vh; outline:none; border-radius:8px;"></video>';
+                        lightboxContainer.innerHTML =
+                            '<video class="gallery-lightbox-media" src="' +
+                            escapeHtml(filePath) +
+                            '" controls autoplay playsinline preload="metadata"></video>';
                     } else {
-                        lightboxContainer.innerHTML = '<img src="' + escapeHtml(filePath) + '" alt="' + escapeHtml(title) + '" data-lightbox-image>';
+                        lightboxContainer.innerHTML =
+                            '<img class="gallery-lightbox-media" src="' +
+                            escapeHtml(filePath) +
+                            '" alt="' +
+                            escapeHtml(title) +
+                            '" data-lightbox-image>';
                     }
                 }
                 if (lightboxTitle) lightboxTitle.textContent = title;
