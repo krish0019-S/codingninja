@@ -215,6 +215,191 @@ var reorderPortfolioFolderSequence = async function (category, folderName, targe
     return orderedFolders;
 };
 
+var getPortfolioFileOrderFile = function (category, folder) {
+    var normCat = normalizeFolderName(category);
+    var normFolder = normalizeFolderName(folder);
+    if (!normCat || !normFolder) return null;
+    return path.join(__dirname, "..", "data", "portfolio-files-order-" + normCat + "-" + normFolder + ".json");
+};
+
+var getPortfolioCoverMapFile = function (category) {
+    var normCat = normalizeFolderName(category);
+    if (!normCat) return null;
+    return path.join(__dirname, "..", "data", "portfolio-cover-" + normCat + ".json");
+};
+
+var readPortfolioCoverMap = async function (category) {
+    var coverFile = getPortfolioCoverMapFile(category);
+    if (!coverFile) return {};
+    try {
+        var raw = await fs.promises.readFile(coverFile, "utf8");
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            return parsed;
+        }
+        return {};
+    } catch (error) {
+        if (error && error.code === "ENOENT") return {};
+        throw error;
+    }
+};
+
+var writePortfolioCoverMap = async function (category, map) {
+    var coverFile = getPortfolioCoverMapFile(category);
+    if (!coverFile) return;
+    var safe = map && typeof map === "object" && !Array.isArray(map) ? map : {};
+    await fs.promises.mkdir(path.dirname(coverFile), { recursive: true });
+    await fs.promises.writeFile(coverFile, JSON.stringify(safe, null, 2), "utf8");
+};
+
+var getPortfolioCoverFileName = async function (category, folder) {
+    var normFolder = normalizeFolderName(folder);
+    if (!normFolder) return "";
+    var coverMap = await readPortfolioCoverMap(category);
+    var name = coverMap[folderKey(normFolder)];
+    if (!name) return "";
+    return String(name || "").trim();
+};
+
+var setPortfolioCoverFileName = async function (category, folder, fileName) {
+    var normFolder = normalizeFolderName(folder);
+    if (!normFolder) throw new Error("Invalid folder.");
+    var nextFileName = String(fileName || "").trim();
+    if (!nextFileName || !GALLERY_FILE_REGEX.test(nextFileName)) {
+        throw new Error("Invalid file name.");
+    }
+
+    var coverMap = await readPortfolioCoverMap(category);
+    coverMap[folderKey(normFolder)] = nextFileName;
+    await writePortfolioCoverMap(category, coverMap);
+    return nextFileName;
+};
+
+var clearPortfolioCoverFileName = async function (category, folder) {
+    var normFolder = normalizeFolderName(folder);
+    if (!normFolder) return;
+    var coverMap = await readPortfolioCoverMap(category);
+    var key = folderKey(normFolder);
+    if (coverMap[key] != null) {
+        delete coverMap[key];
+        await writePortfolioCoverMap(category, coverMap);
+    }
+};
+
+var resolvePortfolioCoverFile = async function (category, folder, files) {
+    var coverName = await getPortfolioCoverFileName(category, folder);
+    var list = Array.isArray(files) ? files : [];
+    var matched = coverName
+        ? list.find(function (f) { return String(f && f.name || "") === coverName; })
+        : null;
+
+    if (matched) return matched;
+
+    if (coverName) {
+        await clearPortfolioCoverFileName(category, folder);
+    }
+
+    return list.length ? list[list.length - 1] : null;
+};
+
+var readPortfolioFileOrder = async function (category, folder) {
+    var orderFile = getPortfolioFileOrderFile(category, folder);
+    if (!orderFile) return [];
+    try {
+        var raw = await fs.promises.readFile(orderFile, "utf8");
+        var parsed = JSON.parse(raw);
+        var list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.order) ? parsed.order : []);
+        var seen = new Set();
+        var normalized = [];
+        list.forEach(function (name) {
+            if (name && !seen.has(name)) {
+                seen.add(name);
+                normalized.push(name);
+            }
+        });
+        return normalized;
+    } catch (error) {
+        if (error && error.code === "ENOENT") return [];
+        console.error(error);
+        return [];
+    }
+};
+
+var writePortfolioFileOrder = async function (category, folder, order) {
+    var orderFile = getPortfolioFileOrderFile(category, folder);
+    if (!orderFile) throw new Error("Invalid category or folder.");
+    var source = Array.isArray(order) ? order : [];
+    var seen = new Set();
+    var normalized = [];
+    source.forEach(function (name) {
+        if (name && !seen.has(name)) {
+            seen.add(name);
+            normalized.push(name);
+        }
+    });
+    await fs.promises.mkdir(path.dirname(orderFile), { recursive: true });
+    await fs.promises.writeFile(orderFile, JSON.stringify({ order: normalized }, null, 2), "utf8");
+    return normalized;
+};
+
+var syncPortfolioFileOrder = async function (category, folder, files) {
+    var physicalFiles = Array.isArray(files) ? files.slice() : [];
+    var physicalFileNames = physicalFiles.map(function(f) { return f.name; });
+    var physicalMap = new Map(physicalFileNames.map(function(name) { return [name, name]; }));
+    
+    var currentOrder = await readPortfolioFileOrder(category, folder);
+    var merged = [];
+    var used = new Set();
+
+    currentOrder.forEach(function (name) {
+        if (physicalMap.has(name) && !used.has(name)) {
+            merged.push(name);
+            used.add(name);
+        }
+    });
+
+    physicalFileNames.forEach(function (name) {
+        if (!used.has(name)) {
+            merged.push(name);
+        }
+    });
+
+    var changed = merged.length !== currentOrder.length || merged.some(function (name, index) {
+        return currentOrder[index] !== name;
+    });
+
+    if (changed) {
+        await writePortfolioFileOrder(category, folder, merged);
+    }
+    
+    var fileMap = new Map(physicalFiles.map(function(f) { return [f.name, f]; }));
+    return merged.map(function(name) { return fileMap.get(name); }).filter(Boolean);
+};
+
+var listPortfolioFilesOrdered = async function (category, folderName) {
+    var files = await listPortfolioFiles(category, folderName);
+    return syncPortfolioFileOrder(category, folderName, files);
+};
+
+var reorderPortfolioFileSequence = async function (category, folder, fileName, targetSequence) {
+    if (!Number.isInteger(targetSequence) || targetSequence < 1) throw new Error("Invalid sequence.");
+    var files = await listPortfolioFiles(category, folder);
+    var fileNames = files.map(function(f) { return f.name; });
+    if (!fileNames.includes(fileName)) throw new Error("File not found.");
+    var orderedFiles = await readPortfolioFileOrder(category, folder);
+    fileNames.forEach(function(name) { if (!orderedFiles.includes(name)) orderedFiles.push(name); });
+    orderedFiles = orderedFiles.filter(function(name) { return fileNames.includes(name); });
+    var currentIndex = orderedFiles.indexOf(fileName);
+    if (currentIndex === -1) throw new Error("File not found in order list.");
+    var clampedIndex = Math.max(0, Math.min(targetSequence - 1, orderedFiles.length - 1));
+    if (currentIndex !== clampedIndex) {
+        orderedFiles.splice(currentIndex, 1);
+        orderedFiles.splice(clampedIndex, 0, fileName);
+        await writePortfolioFileOrder(category, folder, orderedFiles);
+    }
+    return orderedFiles;
+};
+
 var listPortfolioFolders = async function (category) {
     var normCat = normalizeFolderName(category);
     if (!normCat) return [];
@@ -272,6 +457,36 @@ var listPortfolioFiles = async function (category, folderName) {
     return details.sort(function (a, b) {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
+};
+
+var renamePortfolioFile = async function (category, folder, oldName, newNameBase) {
+    var normCat = normalizeFolderName(category);
+    var normFolder = normalizeFolderName(folder);
+    if (!normCat || !normFolder) throw new Error("Invalid folder.");
+    var ext = path.extname(oldName);
+    if (!ext) throw new Error("File has no extension.");
+    var sanitizedNewBase = sanitizeImageBaseName(newNameBase);
+    if (!sanitizedNewBase) throw new Error("Invalid new file name.");
+    var finalNewName = sanitizedNewBase + ext;
+    if (oldName === finalNewName) return { oldName: oldName, newName: finalNewName };
+    var folderDir = getPortfolioFolderDir(normCat, normFolder);
+    if (!folderDir) throw new Error("Invalid folder.");
+    var oldPath = path.join(folderDir, oldName);
+    var newPath = path.join(folderDir, finalNewName);
+    try {
+        await fs.promises.access(newPath);
+        throw new Error("A file with the new name already exists.");
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
+    await fs.promises.rename(oldPath, newPath);
+    var order = await readPortfolioFileOrder(category, folder);
+    var orderIndex = order.indexOf(oldName);
+    if (orderIndex > -1) {
+        order[orderIndex] = finalNewName;
+        await writePortfolioFileOrder(category, folder, order);
+    }
+    return { oldName: oldName, newName: finalNewName };
 };
 
 var PORTFOLIO_MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -2082,8 +2297,8 @@ router.get("/portfolio-folders", adminAuth, async function (req, res) {
     try {
         var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
-            var files = await listPortfolioFiles(category, folder);
-            var coverFile = files.length ? files[files.length - 1] : null;
+            var files = await listPortfolioFilesOrdered(category, folder);
+            var coverFile = await resolvePortfolioCoverFile(category, folder, files);
             return {
                 name: folder,
                 fileCount: files.length,
@@ -2103,8 +2318,8 @@ router.get("/portfolio-folders-public", async function (req, res) {
     try {
         var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
-            var files = await listPortfolioFiles(category, folder);
-            var coverFile = files.length ? files[files.length - 1] : null;
+            var files = await listPortfolioFilesOrdered(category, folder);
+            var coverFile = await resolvePortfolioCoverFile(category, folder, files);
             return {
                 name: folder,
                 fileCount: files.length,
@@ -2126,7 +2341,7 @@ router.get("/portfolio-files-public", async function (req, res) {
     if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
     
     try {
-        var files = await listPortfolioFiles(category, folderName);
+        var files = await listPortfolioFilesOrdered(category, folderName);
         return res.json({ ok: true, folder: folderName, files: files });
     } catch (error) {
         return res.status(500).json({ ok: false, message: "Unable to load portfolio files." });
@@ -2153,8 +2368,8 @@ router.post("/portfolio-folders", adminAuth, async function (req, res) {
 
         var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
-            var files = await listPortfolioFiles(category, folder);
-            var coverFile = files.length ? files[files.length - 1] : null;
+            var files = await listPortfolioFilesOrdered(category, folder);
+            var coverFile = await resolvePortfolioCoverFile(category, folder, files);
             return {
                 name: folder,
                 fileCount: files.length,
@@ -2188,8 +2403,8 @@ router.post("/portfolio-folders/reorder", adminAuth, async function (req, res) {
 
         var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
-            var files = await listPortfolioFiles(category, folder);
-            var coverFile = files.length ? files[files.length - 1] : null;
+            var files = await listPortfolioFilesOrdered(category, folder);
+            var coverFile = await resolvePortfolioCoverFile(category, folder, files);
             return {
                 name: folder,
                 fileCount: files.length,
@@ -2229,8 +2444,8 @@ router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, 
         
         var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
-            var files = await listPortfolioFiles(category, folder);
-            var coverFile = files.length ? files[files.length - 1] : null;
+            var files = await listPortfolioFilesOrdered(category, folder);
+            var coverFile = await resolvePortfolioCoverFile(category, folder, files);
             return {
                 name: folder,
                 fileCount: files.length,
@@ -2250,8 +2465,9 @@ router.get("/portfolio-files", adminAuth, async function (req, res) {
     if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
     
     try {
-        var files = await listPortfolioFiles(category, folderName);
-        return res.json({ ok: true, folder: folderName, files: files });
+        var files = await listPortfolioFilesOrdered(category, folderName);
+        var coverFile = await resolvePortfolioCoverFile(category, folderName, files);
+        return res.json({ ok: true, folder: folderName, files: files, coverFileName: coverFile ? coverFile.name : "" });
     } catch (error) {
         return res.status(500).json({ ok: false, message: "Unable to load portfolio files." });
     }
@@ -2288,8 +2504,13 @@ router.post("/portfolio-files", adminAuth, function (req, res) {
                 uploaded.push(fileName);
             }
             
-            var fileList = await listPortfolioFiles(category, folderName);
-            return res.json({ ok: true, message: "Files uploaded successfully.", files: fileList });
+            var order = await readPortfolioFileOrder(category, folderName);
+            var newOrder = uploaded.concat(order);
+            await writePortfolioFileOrder(category, folderName, newOrder);
+
+            var fileList = await listPortfolioFilesOrdered(category, folderName);
+            var coverFile = await resolvePortfolioCoverFile(category, folderName, fileList);
+            return res.json({ ok: true, message: "Files uploaded successfully.", files: fileList, coverFileName: coverFile ? coverFile.name : "" });
         } catch (error) {
             return res.status(500).json({ ok: false, message: "Unable to upload files." });
         }
@@ -2311,10 +2532,62 @@ router.delete("/portfolio-files/:fileName", adminAuth, async function (req, res)
         if (!targetPath.startsWith(folderDir + path.sep)) return res.status(400).json({ ok: false, message: "Invalid file name." });
         
         await fs.promises.unlink(targetPath);
-        var fileList = await listPortfolioFiles(category, folderName);
-        return res.json({ ok: true, message: "File removed successfully.", files: fileList });
+
+        var order = await readPortfolioFileOrder(category, folderName);
+        var newOrder = order.filter(function(name) { return name !== fileName; });
+        if (newOrder.length < order.length) {
+            await writePortfolioFileOrder(category, folderName, newOrder);
+        }
+
+        var fileList = await listPortfolioFilesOrdered(category, folderName);
+        var coverName = await getPortfolioCoverFileName(category, folderName);
+        if (coverName && coverName === fileName) {
+            await clearPortfolioCoverFileName(category, folderName);
+        }
+        var coverFile = await resolvePortfolioCoverFile(category, folderName, fileList);
+        return res.json({ ok: true, message: "File removed successfully.", files: fileList, coverFileName: coverFile ? coverFile.name : "" });
     } catch (error) {
+        if (error && error.code === 'ENOENT') {
+            return res.status(404).json({ ok: false, message: "File not found." });
+        }
         return res.status(500).json({ ok: false, message: "Unable to remove file." });
+    }
+});
+
+router.post("/portfolio-files/rename", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+    var oldName = getRequestValue(req, "oldName");
+    var newNameBase = getRequestValue(req, "newName");
+    if (!category || !folderName || !oldName || !newNameBase) return res.status(400).json({ ok: false, message: "Missing required parameters." });
+    try {
+        var renameResult = await renamePortfolioFile(category, folderName, oldName, newNameBase);
+        var coverName = await getPortfolioCoverFileName(category, folderName);
+        if (coverName && coverName === renameResult.oldName) {
+            await setPortfolioCoverFileName(category, folderName, renameResult.newName);
+        }
+        var files = await listPortfolioFilesOrdered(category, folderName);
+        var coverFile = await resolvePortfolioCoverFile(category, folderName, files);
+        return res.json({ ok: true, message: "File renamed successfully.", files: files, coverFileName: coverFile ? coverFile.name : "" });
+    } catch (error) {
+        if (error.message.includes("already exists")) return res.status(409).json({ ok: false, message: error.message });
+        return res.status(500).json({ ok: false, message: error.message || "Unable to rename file." });
+    }
+});
+
+router.post("/portfolio-files/reorder", adminAuth, async function (req, res) {
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+    var fileName = getRequestValue(req, "fileName");
+    var sequence = Number(getRequestValue(req, "sequence"));
+    if (!category || !folderName || !fileName || !sequence) return res.status(400).json({ ok: false, message: "Missing required parameters." });
+    try {
+        await reorderPortfolioFileSequence(category, folderName, fileName, sequence);
+        var files = await listPortfolioFilesOrdered(category, folderName);
+        var coverFile = await resolvePortfolioCoverFile(category, folderName, files);
+        return res.json({ ok: true, message: "File sequence updated.", files: files, coverFileName: coverFile ? coverFile.name : "" });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: error.message || "Unable to reorder file." });
     }
 });
 

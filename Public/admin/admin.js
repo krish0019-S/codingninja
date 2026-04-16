@@ -584,6 +584,10 @@ $(function () {
             .replace(/'/g, "&#39;");
     };
 
+    var prettifyFileName = function (value) {
+        return String(value || "").trim().replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+    };
+
     var normalizeNewsUrl = function (value) {
         var raw = String(value || "").trim();
         if (!raw) {
@@ -1139,7 +1143,7 @@ $(function () {
             var sequenceOptions = buildSequenceOptions(normalizedCards.length, originalIndex + 1);
 
             return (
-                '<div class="col-sm-6 col-md-4 col-xl-3">' +
+                '<div class="col-auto" style="width: 280px; max-width: 100%;">' +
                     '<div class="gallery-folder-card' + activeClass + '" data-folder-name="' + escapeHtml(item.name) + '" style="cursor: pointer; display: flex; flex-direction: column; text-align: left; position: relative;">' +
                         '<div class="gallery-folder-sequence" style="position: absolute; top: 10px; right: 10px; z-index: 10;" onclick="event.stopPropagation();">' +
                             '<select class="form-select form-select-sm gallery-sequence-select shadow-sm" style="font-size: 13px; padding: 2px 27px 2px 8px; height: 26px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); background-color: rgba(255,255,255,0.95); font-weight: 600;" aria-label="Folder Sequence" title="Change Sequence">' +
@@ -1381,7 +1385,7 @@ $(function () {
             var sequenceOptions = buildSequenceOptions(normalizedCards.length, originalIndex + 1);
 
             return (
-                '<div class="col-sm-6 col-md-4 col-xl-3">' +
+                '<div class="col-auto" style="width: 280px; max-width: 100%;">' +
                     '<div class="gallery-folder-card gallery-folder-card-video' + activeClass + '" data-folder-name="' + escapeHtml(item.name) + '" style="cursor: pointer; display: flex; flex-direction: column; text-align: left; position: relative;">' +
                         '<div class="video-folder-sequence" style="position: absolute; top: 10px; right: 10px; z-index: 10;" onclick="event.stopPropagation();">' +
                             '<select class="form-select form-select-sm video-sequence-select shadow-sm" style="font-size: 13px; padding: 2px 27px 2px 8px; height: 26px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); background-color: rgba(255,255,255,0.95); font-weight: 600;" aria-label="Folder Sequence" title="Change Sequence">' +
@@ -1562,7 +1566,7 @@ $(function () {
             var sequenceOptions = buildSequenceOptions(normalizedCards.length, index + 1);
             
             return (
-                '<div class="col-sm-6 col-md-4 col-xl-3">' +
+                '<div class="col-auto" style="width: 280px; max-width: 100%;">' +
                     '<div class="gallery-folder-card gallery-folder-card-portfolio' + activeClass + '" data-folder-name="' + escapeHtml(item.name) + '" style="cursor: pointer; display: flex; flex-direction: column; text-align: left; position: relative;">' +
                         '<div class="portfolio-folder-sequence" style="position: absolute; top: 10px; right: 10px; z-index: 10;" onclick="event.stopPropagation();">' +
                             '<select class="form-select form-select-sm portfolio-sequence-select shadow-sm" style="font-size: 13px; padding: 2px 27px 2px 8px; height: 26px; border-radius: 13px; cursor: pointer; border: 1px solid rgba(0,0,0,0.1); background-color: rgba(255,255,255,0.95); font-weight: 600;" aria-label="Folder Sequence" title="Change Sequence">' +
@@ -1632,7 +1636,7 @@ $(function () {
         }
         
         var cacheBust = Date.now();
-        var cards = items.map(function (item) {
+        var cards = items.map(function (item, index) {
             var fileName = String((item && item.name) || "");
             if (!fileName) return "";
             
@@ -1647,13 +1651,28 @@ $(function () {
                 : '<img src="' + previewUrl + '" alt="' + escapeHtml(fileName) + '">';
                 
             var deleteIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+            var editIcon = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+            var saveIcon = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+            var prettyName = prettifyFileName(fileName);
+            var sequenceOptions = buildSequenceOptions(items.length, index + 1);
                 
             return (
-                '<div class="col-6 col-sm-3 col-md-2 col-lg-2 col-xl-2">' +
-                    '<article class="gallery-image-card" data-file-name="' + fileName + '">' +
+                '<div class="col-6 col-sm-4 col-md-3">' +
+                    '<article class="gallery-image-card" data-file-name="' + escapeHtml(fileName) + '">' +
                         '<div class="gallery-image-preview' + (isVideo ? ' gallery-video-preview' : '') + '">' + mediaHtml + '</div>' +
-                        '<div class="gallery-image-body" style="padding: 10px; display: flex; justify-content: center;">' +
-                            '<button class="btn btn-outline-danger btn-sm btn-portfolio-remove" type="button" data-file-name="' + fileName + '" title="Delete file" style="padding: 6px 16px;">' + deleteIcon + '</button>' +
+                        '<div class="gallery-image-body" style="padding: 10px; display: grid; gap: 8px; text-align: center;">' +
+                            '<div class="portfolio-file-name-display" style="display: flex; align-items: center; justify-content: center; gap: 6px;">' +
+                                '<span class="portfolio-file-name-text" style="font-weight: 600; font-size: 0.85rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="' + escapeHtml(prettyName) + '">' + escapeHtml(prettyName) + '</span>' +
+                                '<button class="btn btn-sm btn-light btn-edit-portfolio-file" type="button" title="Edit name" style="padding: 2px 5px; line-height: 1;">' + editIcon + '</button>' +
+                            '</div>' +
+                            '<div class="portfolio-file-name-edit" style="display: none; gap: 6px; align-items: center;">' +
+                                '<input type="text" class="form-control form-control-sm portfolio-file-name-input" value="' + escapeHtml(prettyName) + '">' +
+                                '<button class="btn btn-sm btn-success btn-save-portfolio-file" type="button" title="Save name" style="padding: 2px 5px; line-height: 1;">' + saveIcon + '</button>' +
+                            '</div>' +
+                            '<div class="portfolio-file-actions" style="display: flex; gap: 8px; justify-content: center;">' +
+                                '<select class="form-select form-select-sm portfolio-file-sequence-select" title="Change sequence" style="width: auto;">' + sequenceOptions + '</select>' +
+                                '<button class="btn btn-outline-danger btn-sm btn-portfolio-remove" type="button" data-file-name="' + escapeHtml(fileName) + '" title="Delete file" style="padding: 4px 8px;">' + deleteIcon + '</button>' +
+                            '</div>' +
                         '</div>' +
                     '</article>' +
                 '</div>'
@@ -3604,6 +3623,85 @@ $(function () {
                 if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
                 showAlert(msg, "danger");
                 selectEl.prop("disabled", false);
+            }
+        });
+    });
+
+    portfolioFileGrid.on("click", ".btn-edit-portfolio-file", function() {
+        var card = $(this).closest(".gallery-image-card");
+        card.find(".portfolio-file-name-display").hide();
+        card.find(".portfolio-file-name-edit").css("display", "flex");
+        card.find(".portfolio-file-name-input").trigger("focus").trigger("select");
+    });
+
+    portfolioFileGrid.on("click", ".btn-save-portfolio-file", function() {
+        if (!ensureAuth()) return;
+        var card = $(this).closest(".gallery-image-card");
+        var oldName = card.data("fileName");
+        var newNameBase = card.find(".portfolio-file-name-input").val().trim();
+
+        if (!newNameBase) {
+            showAlert("File name cannot be empty.", "danger");
+            return;
+        }
+
+        var button = $(this);
+        button.prop("disabled", true);
+
+        $.ajax({
+            url: "/admin/portfolio-files/rename",
+            method: "POST",
+            contentType: "application/json",
+            headers: getAuthHeaders(),
+            data: JSON.stringify({
+                category: currentPortfolioCategory,
+                folder: currentPortfolioFolder,
+                oldName: oldName,
+                newName: newNameBase
+            }),
+            success: function(response) {
+                showAlert("File renamed successfully.", "success");
+                renderPortfolioFiles(response.files || []);
+            },
+            error: function(xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || "Unable to rename file.";
+                showAlert(msg, "danger");
+                button.prop("disabled", false);
+            },
+        });
+    });
+
+    portfolioFileGrid.on("change", ".portfolio-file-sequence-select", function() {
+        if (!ensureAuth()) return;
+        
+        var select = $(this);
+        var card = select.closest(".gallery-image-card");
+        var fileName = card.data("fileName");
+        var sequence = Number(select.val());
+
+        if (!fileName || !sequence) {
+            showAlert("Invalid file or sequence.", "danger");
+            return;
+        }
+
+        select.prop("disabled", true);
+
+        $.ajax({
+            url: "/admin/portfolio-files/reorder",
+            method: "POST",
+            contentType: "application/json",
+            headers: getAuthHeaders(),
+            data: JSON.stringify({ category: currentPortfolioCategory, folder: currentPortfolioFolder, fileName: fileName, sequence: sequence }),
+            success: function(response) {
+                showAlert("Sequence updated.", "success");
+                renderPortfolioFiles(response.files || []);
+            },
+            error: function(xhr) {
+                if (handleAuthError(xhr)) return;
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || "Unable to update sequence.";
+                showAlert(msg, "danger");
+                select.prop("disabled", false);
             }
         });
     });

@@ -177,7 +177,6 @@
         var publicSelectedFolder = document.querySelector("[data-public-selected-folder]");
         var publicBrowserTitle = document.querySelector("[data-public-browser-title]");
         var publicBrowserSubtitle = document.querySelector("[data-public-browser-subtitle]");
-        var publicFolderBack = document.querySelector("[data-public-folder-back]");
         var publicFolderPrev = document.querySelector("[data-public-folder-prev]");
         var publicFolderNext = document.querySelector("[data-public-folder-next]");
         
@@ -219,7 +218,6 @@
             var isFolderView = mode === "folder";
             if (publicFolderGrid) publicFolderGrid.hidden = isFolderView;
             if (publicImageGrid) publicImageGrid.hidden = !isFolderView;
-            if (publicFolderBack) publicFolderBack.hidden = !isFolderView;
             
             if (publicBrowserTitle) {
                 publicBrowserTitle.textContent = isFolderView ? prettifyName(folderName) + " Folder" : "Project Folders";
@@ -231,24 +229,8 @@
                 publicSelectedFolder.hidden = !isFolderView;
                 publicSelectedFolder.textContent = isFolderView ? "Folder: " + prettifyName(folderName) : "Folder: -";
             }
-            if (publicFolderBack) {
-                var url = new URL(window.location.href);
-                url.searchParams.delete("folder");
-                publicFolderBack.href = url.toString();
-            }
             updatePublicFolderNav();
         };
-
-        if (publicFolderBack) {
-            publicFolderBack.addEventListener("click", function(e) {
-                e.preventDefault();
-                var url = new URL(window.location.href);
-                url.searchParams.delete("folder");
-                window.history.pushState({}, "", url);
-                setPublicViewMode("folders", "");
-                currentPublicFolder = "";
-            });
-        }
 
         var navigatePublicFolder = function (direction) {
             if (!currentPublicFolder || publicFolderOrder.length <= 1) return;
@@ -350,7 +332,7 @@
                         var folderLink = "?folder=" + encodeURIComponent(item.name);
                         
                         return (
-                            '<a class="gallery-folder-card-public" href="' + folderLink + '" data-public-folder-name="' + escapeHtml(item.name) + '">' +
+                            '<a class="gallery-folder-card-public" href="' + folderLink + '" data-public-folder-name="' + escapeHtml(item.name) + '" style="max-width: 320px; width: 100%; margin: 0 auto;">' +
                                 '<span class="gallery-folder-cover' + (isVideo ? ' gallery-folder-cover-video' : '') + '">' + coverMarkup + '<span class="gallery-folder-cover-title">' + escapeHtml(prettifyName(item.name)) + '</span></span>' +
                                 '<span class="gallery-folder-info">' +
                                     '<span class="gallery-folder-count">' + item.fileCount + ' item(s)</span>' +

@@ -583,7 +583,7 @@
                 const centeredTitle = escapeHtml(prettifyName(item.name));
 
                 return (
-                    `<a class="gallery-folder-card-public${activeClass}" href="${folderLink}" data-public-folder-name="${item.name}">` +
+                    `<a class="gallery-folder-card-public${activeClass}" href="${folderLink}" data-public-folder-name="${item.name}" style="max-width: 320px; width: 100%; margin: 0 auto;">` +
                     `<span class="gallery-folder-cover gallery-folder-cover-video">${coverMarkup}<span class="gallery-folder-cover-title">${centeredTitle}</span></span>` +
                     `<span class="gallery-folder-info">` +
                     `<span class="gallery-folder-count">${item.videoCount} video(s)</span>` +
@@ -770,4 +770,3 @@
 </body>
 
 </html>
-
