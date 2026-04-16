@@ -2432,12 +2432,37 @@ router.post("/portfolio-folders/reorder", adminAuth, async function (req, res) {
     }
 });
 
+router.post("/portfolio-folders/cover", adminAuth, async function (req, res) {
+    var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
+    var folderName = normalizeFolderName((req.query && req.query.folder) || getRequestValue(req, "folder"));
+    var fileName = String(getRequestValue(req, "fileName") || "").trim();
+
+    if (!category || !folderName || !fileName || !GALLERY_FILE_REGEX.test(fileName)) {
+        return res.status(400).json({ ok: false, message: "Invalid category, folder, or file name." });
+    }
+
+    try {
+        var files = await listPortfolioFilesOrdered(category, folderName);
+        var exists = files.some(function (f) { return String(f && f.name || "") === fileName; });
+        if (!exists) {
+            return res.status(404).json({ ok: false, message: "File not found in this folder." });
+        }
+
+        await setPortfolioCoverFileName(category, folderName, fileName);
+        return res.json({ ok: true, message: "Folder cover updated successfully.", coverFileName: fileName });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: "Unable to update folder cover." });
+    }
+});
+
 router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, res) {
     var category = normalizeFolderName((req.query && req.query.category) || getRequestValue(req, "category"));
     var folderName = normalizeFolderName(req.params.folderName);
     if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
 
     try {
+        await clearPortfolioCoverFileName(category, folderName);
         var folderDir = getPortfolioFolderDir(category, folderName);
         if (!folderDir) return res.status(400).json({ ok: false, message: "Invalid folder name." });
         await fs.promises.rm(folderDir, { recursive: true, force: false });
