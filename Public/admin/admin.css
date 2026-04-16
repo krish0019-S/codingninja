@@ -815,10 +815,7 @@ body.admin-body.is-ready .admin-layout {
 .dashboard-grid {
     display: grid;
     gap: 14px;
-    grid-template-columns: 1.45fr 1fr 1fr;
-    grid-template-areas:
-        "analytics reminder projects"
-        "team progress tracker";
+    grid-template-columns: 1fr 1fr;
     align-items: stretch;
 }
 
@@ -858,8 +855,6 @@ body.admin-body.is-ready .admin-layout {
 }
 
 .dashboard-panel-analytics {
-    grid-area: analytics;
-    grid-column: 1 / -1;
     --analytics-chart-height: 260px;
 }
 
@@ -2387,12 +2382,7 @@ body.admin-body.is-ready .admin-layout {
     }
 
     .dashboard-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-template-areas:
-            "analytics analytics"
-            "reminder projects"
-            "team progress"
-            "team tracker";
+        grid-template-columns: 1fr;
     }
 
     .news-list-head,
@@ -2603,12 +2593,7 @@ body.admin-body.is-ready .admin-layout {
     }
 
     .dashboard-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-template-areas:
-            "analytics analytics"
-            "reminder projects"
-            "team team"
-            "progress tracker";
+        grid-template-columns: 1fr;
     }
 
     .manager-toolbar {
@@ -2800,13 +2785,6 @@ body.admin-body.is-ready .admin-layout {
 
     .dashboard-grid {
         grid-template-columns: 1fr;
-        grid-template-areas:
-            "analytics"
-            "reminder"
-            "projects"
-            "team"
-            "progress"
-            "tracker";
     }
 
     .dashboard-panel-analytics {

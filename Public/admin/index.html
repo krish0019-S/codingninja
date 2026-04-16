@@ -187,9 +187,20 @@
                             <span><i class="analytics-legend-dot accent"></i>Enquiries</span>
                         </div>
                     </article>
+                    <article class="dashboard-panel dashboard-panel-portfolio-analytics">
+                        <div class="dashboard-panel-head">
+                            <h3>Portfolio Analytics</h3>
+                        </div>
+                        <p class="analytics-level-title">File Counts by Category</p>
+                        <div class="analytics-level-graph">
+                            <div class="analytics-level-chart analytics-chart-wrap">
+                                <canvas id="dashboardPortfolioChart" aria-label="Portfolio analytics bar chart"></canvas>
+                            </div>
+                            <div class="analytics-level-stats" id="dashboardPortfolioStats" aria-label="Portfolio analytics percentages"></div>
+                        </div>
+                        <div class="analytics-level-legend" id="dashboardPortfolioLegend" aria-label="Graph legend"></div>
+                    </article>
                 </div>
-
-               
             </section>
 
             <section id="bannersSection" class="admin-section d-none">
@@ -312,6 +323,7 @@
                         </div>
                     </article>
                 </div>
+
             </section>
 
             <section id="imagesSection" class="admin-section d-none">

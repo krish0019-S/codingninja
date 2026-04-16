@@ -54,6 +54,9 @@ $(function () {
     var dashboardAnalyticsChartEl = document.getElementById("dashboardAnalyticsChart");
     var dashboardAnalyticsStats = $("#dashboardAnalyticsStats");
     var dashboardLiveClock = $("#dashboardLiveClock");
+    var dashboardPortfolioChartEl = document.getElementById("dashboardPortfolioChart");
+    var dashboardPortfolioStats = $("#dashboardPortfolioStats");
+    var dashboardPortfolioLegend = $("#dashboardPortfolioLegend");
     var dashboardProgressRing = $("#dashboardProgressRing");
     var dashboardProjectProgressPercent = $("#dashboardProjectProgressPercent");
     var dashboardProjectProgressLabel = $("#dashboardProjectProgressLabel");
@@ -120,11 +123,19 @@ $(function () {
         imageFiles: 0,
         videoFolders: 0,
         videoFiles: 0,
+        printing: 0,
+        outdoor: 0,
+        online: 0,
+        "photoshot-video": 0,
+        events: 0,
+        promotional: 0,
+        "electronic-ads": 0,
     };
     var dashboardClockTimer = null;
     var dashboardAnalyticsChart = null;
     var analyticsRefreshTimer = null;
     var lastAnalyticsSnapshot = null;
+    var dashboardPortfolioChart = null;
     var NEWS_CONTENT_MAX_LENGTH = 1210;
 
     var currentBanners = [];
@@ -1688,6 +1699,9 @@ $(function () {
         if (dashboardAnalyticsChart) {
             dashboardAnalyticsChart.resize();
         }
+        if (dashboardPortfolioChart) {
+            dashboardPortfolioChart.resize();
+        }
     };
 
 
@@ -1745,15 +1759,22 @@ $(function () {
         var imageFiles = source.imageFiles != null ? source.imageFiles : source.images;
         var videoFiles = source.videoFiles != null ? source.videoFiles : source.videos;
         return {
-            videos: coerceAnalyticsCount(source.videos != null ? source.videos : videoFiles),
-            images: coerceAnalyticsCount(source.images != null ? source.images : imageFiles),
-            slider: coerceAnalyticsCount(source.slider),
-            news: coerceAnalyticsCount(source.news),
-            enquiries: coerceAnalyticsCount(source.enquiries),
-            imageFolders: coerceAnalyticsCount(source.imageFolders),
-            imageFiles: coerceAnalyticsCount(imageFiles),
-            videoFolders: coerceAnalyticsCount(source.videoFolders),
-            videoFiles: coerceAnalyticsCount(videoFiles),
+            videos: coerceAnalyticsCount(videoFiles),
+            images: coerceAnalyticsCount(imageFiles),
+            slider: coerceAnalyticsCount(source.slider || 0),
+            news: coerceAnalyticsCount(source.news || 0),
+            enquiries: coerceAnalyticsCount(source.enquiries || 0),
+            imageFolders: coerceAnalyticsCount(source.imageFolders || 0),
+            imageFiles: coerceAnalyticsCount(imageFiles || 0),
+            videoFolders: coerceAnalyticsCount(source.videoFolders || 0),
+            videoFiles: coerceAnalyticsCount(videoFiles || 0),
+            printing: coerceAnalyticsCount(source.printing || 0),
+            outdoor: coerceAnalyticsCount(source.outdoor || 0),
+            online: coerceAnalyticsCount(source.online || 0),
+            "photoshot-video": coerceAnalyticsCount(source["photoshot-video"] || 0),
+            events: coerceAnalyticsCount(source.events || 0),
+            promotional: coerceAnalyticsCount(source.promotional || 0),
+            "electronic-ads": coerceAnalyticsCount(source["electronic-ads"] || 0),
         };
     };
 
@@ -1763,6 +1784,16 @@ $(function () {
         { key: "slider", label: "Slider", className: "dark", color: "#b31217" },
         { key: "news", label: "News", className: "striped", color: "#ff8e3b" },
         { key: "enquiries", label: "Enquiries", className: "accent", color: "#f43f5e" },
+    ];
+
+    var portfolioAnalyticsPalette = [
+        { key: "printing", label: "Printing", color: "#ff6384" },
+        { key: "outdoor", label: "Outdoor", color: "#36a2eb" },
+        { key: "online", label: "Online", color: "#ffce56" },
+        { key: "photoshot-video", label: "Photo/Video", color: "#4bc0c0" },
+        { key: "events", label: "Events", color: "#9966ff" },
+        { key: "promotional", label: "Promotional", color: "#ff9f40" },
+        { key: "electronic-ads", label: "E-Ads", color: "#c9cbcf" },
     ];
 
     var buildAnalyticsItems = function (payload) {
@@ -1778,6 +1809,18 @@ $(function () {
         });
     };
 
+    var buildPortfolioAnalyticsItems = function (payload) {
+        var normalized = normalizeAnalyticsPayload(payload);
+        return portfolioAnalyticsPalette.map(function (item) {
+            return {
+                key: item.key,
+                label: item.label,
+                value: normalized[item.key],
+                color: item.color,
+            };
+        });
+    };
+
     var generateRandomAnalytics = function () {
         var randomBetween = function (min, max) {
             return Math.floor(min + Math.random() * (max - min + 1));
@@ -1788,7 +1831,7 @@ $(function () {
         var imageFolders = Math.max(1, Math.round(images / 12));
         var videoFolders = Math.max(1, Math.round(videos / 10));
 
-        return {
+        var data = {
             videos: videos,
             images: images,
             slider: randomBetween(4, 36),
@@ -1799,6 +1842,10 @@ $(function () {
             videoFolders: videoFolders,
             videoFiles: videos,
         };
+        portfolioAnalyticsPalette.forEach(function(item) {
+            data[item.key] = randomBetween(5, 50);
+        });
+        return data;
     };
 
     var updateMetricDelta = function (element, delta) {
@@ -1944,6 +1991,95 @@ $(function () {
         dashboardAnalyticsStats.html(statsHtml);
     };
 
+    var ensurePortfolioChart = function (seedData) {
+        if (dashboardPortfolioChart || !dashboardPortfolioChartEl || typeof Chart === "undefined") {
+            return;
+        }
+
+        var items = buildPortfolioAnalyticsItems(seedData || dashboardMetrics);
+        var ctx = dashboardPortfolioChartEl.getContext("2d");
+        dashboardPortfolioChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: items.map(function (item) { return item.label; }),
+                datasets: [{
+                    label: "Files",
+                    data: items.map(function (item) { return item.value; }),
+                    backgroundColor: items.map(function (item) { return item.color; }),
+                    borderColor: items.map(function (item) { return item.color; }),
+                    borderWidth: 1.2,
+                    borderRadius: 12,
+                    borderSkipped: false,
+                    maxBarThickness: 46,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 900, easing: "easeOutQuart" },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "#0f172a",
+                        titleColor: "#f8fafc",
+                        bodyColor: "#e2e8f0",
+                        padding: 12,
+                        displayColors: false,
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: "#475569", font: { weight: "600" } },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: "#64748b", precision: 0 },
+                        grid: { color: "rgba(15, 23, 42, 0.08)" },
+                    },
+                },
+            },
+        });
+    };
+
+    var updatePortfolioChart = function (items) {
+        if (!dashboardPortfolioChart) {
+            ensurePortfolioChart(items.reduce(function (acc, item) {
+                acc[item.key] = item.value;
+                return acc;
+            }, {}));
+        }
+        if (!dashboardPortfolioChart) return;
+
+        dashboardPortfolioChart.data.labels = items.map(function (item) { return item.label; });
+        dashboardPortfolioChart.data.datasets[0].data = items.map(function (item) { return item.value; });
+        dashboardPortfolioChart.data.datasets[0].backgroundColor = items.map(function (item) { return item.color; });
+        dashboardPortfolioChart.data.datasets[0].borderColor = items.map(function (item) { return item.color; });
+        dashboardPortfolioChart.update();
+    };
+
+    var updatePortfolioStats = function (items) {
+        if (!dashboardPortfolioStats.length) return;
+        var total = items.reduce(function (sum, item) { return sum + (Number(item.value) || 0); }, 0);
+        var statsHtml = items.map(function (item) {
+            var ratio = total > 0 ? item.value / total : 0;
+            var pctText = (ratio * 100).toFixed(1).replace(/\.0$/, "");
+            return (
+                '<div class="analytics-stat-row">' +
+                    '<span class="analytics-stat-label"><i class="analytics-stat-dot" style="background-color:' + item.color + '"></i>' + escapeHtml(item.label) + "</span>" +
+                    '<strong class="analytics-stat-value">' + pctText + "%</strong>" +
+                "</div>"
+            );
+        }).join("");
+        dashboardPortfolioStats.html(statsHtml);
+    };
+
+    var updatePortfolioLegend = function (items) {
+        if (!dashboardPortfolioLegend.length) return;
+        var legendHtml = items.map(function(item) { return '<span><i class="analytics-legend-dot" style="background-color:' + item.color + '"></i>' + escapeHtml(item.label) + '</span>'; }).join("");
+        dashboardPortfolioLegend.html(legendHtml);
+    };
+
     var renderDashboardMetrics = function (previousData) {
         var current = normalizeAnalyticsPayload(dashboardMetrics);
         var previous = normalizeAnalyticsPayload(previousData || current);
@@ -1976,6 +2112,11 @@ $(function () {
 
         updateAnalyticsChart(items);
         updateAnalyticsStats(items);
+
+        var portfolioItems = buildPortfolioAnalyticsItems(current);
+        updatePortfolioChart(portfolioItems);
+        updatePortfolioStats(portfolioItems);
+        updatePortfolioLegend(portfolioItems);
     };
 
     var resetDashboardMetrics = function () {
@@ -1990,6 +2131,9 @@ $(function () {
             videoFolders: 0,
             videoFiles: 0,
         };
+        portfolioAnalyticsPalette.forEach(function(item) {
+            dashboardMetrics[item.key] = 0;
+        });
         lastAnalyticsSnapshot = null;
         renderDashboardMetrics(dashboardMetrics);
     };
@@ -2020,6 +2164,9 @@ $(function () {
 
         if (!dashboardAnalyticsChart) {
             ensureAnalyticsChart(generateRandomAnalytics());
+        }
+        if (!dashboardPortfolioChart) {
+            ensurePortfolioChart(generateRandomAnalytics());
         }
 
         fetchAnalyticsData()

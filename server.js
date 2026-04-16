@@ -17,6 +17,14 @@ var IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png"]);
 var VIDEO_EXTS = new Set([".mp4", ".webm", ".ogg", ".mov", ".m4v"]);
 var GALLERY_IMAGE_ROOT_DIR = path.join(__dirname, "Public", "images", "gallery");
 var GALLERY_VIDEO_ROOT_DIR = path.join(__dirname, "Public", "videos", "gallery");
+var PORTFOLIO_ROOT_DIR = path.join(__dirname, "Public", "portfolio");
+var PORTFOLIO_CATEGORIES = [
+    "printing", "outdoor", "online", "photoshot-video", "events", "promotional", "electronic-ads"
+];
+var PORTFOLIO_FILE_EXTS = new Set([".jpg", ".jpeg", ".png", ".mp4"]);
+
+
+
 
 
 var getRequestBody = function (req) {
@@ -144,6 +152,22 @@ var countGalleryStats = async function (rootDir, allowedExts) {
     };
 };
 
+var countPortfolioStats = async function () {
+    var stats = {};
+    for (var i = 0; i < PORTFOLIO_CATEGORIES.length; i++) {
+        var category = PORTFOLIO_CATEGORIES[i];
+        var categoryDir = path.join(PORTFOLIO_ROOT_DIR, category);
+        try {
+            await fs.promises.mkdir(categoryDir, { recursive: true });
+            var categoryStats = await countGalleryStats(categoryDir, PORTFOLIO_FILE_EXTS);
+            stats[category] = categoryStats.fileCount || 0;
+        } catch (error) {
+            stats[category] = 0;
+        }
+    }
+    return stats;
+};
+
 app.use(express.static("Public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -164,9 +188,8 @@ app.get("/analytics", async function (req, res) {
             countGalleryStats(GALLERY_VIDEO_ROOT_DIR, VIDEO_EXTS).catch(function () {
                 return { folderCount: 0, fileCount: 0 };
             }),
-            enquiries.countEnquiries().catch(function () {
-                return 0;
-            }),
+            enquiries.countEnquiries().catch(function () { return 0; }),
+            countPortfolioStats().catch(function() { return {}; })
         ]);
 
         var banners = Array.isArray(results[0]) ? results[0] : [];
@@ -174,8 +197,9 @@ app.get("/analytics", async function (req, res) {
         var imageStats = results[2] || { folderCount: 0, fileCount: 0 };
         var videoStats = results[3] || { folderCount: 0, fileCount: 0 };
         var enquiryCount = Number(results[4]) || 0;
+        var portfolioStats = results[5] || {};
 
-        return res.json({
+        var responsePayload = {
             videos: Math.max(0, Number(videoStats.fileCount) || 0),
             images: Math.max(0, Number(imageStats.fileCount) || 0),
             slider: Math.max(0, banners.length),
@@ -185,10 +209,13 @@ app.get("/analytics", async function (req, res) {
             videoFolders: Math.max(0, Number(videoStats.folderCount) || 0),
             imageFiles: Math.max(0, Number(imageStats.fileCount) || 0),
             videoFiles: Math.max(0, Number(videoStats.fileCount) || 0),
-        });
+        };
+
+        Object.assign(responsePayload, portfolioStats);
+        return res.json(responsePayload);
     } catch (error) {
         console.error("Analytics count failed:", error);
-        return res.json({
+        var fallbackResponse = {
             videos: 0,
             images: 0,
             slider: 0,
@@ -198,7 +225,9 @@ app.get("/analytics", async function (req, res) {
             videoFolders: 0,
             imageFiles: 0,
             videoFiles: 0,
-        });
+        };
+        PORTFOLIO_CATEGORIES.forEach(function(cat) { fallbackResponse[cat] = 0; });
+        return res.json(fallbackResponse);
     }
 });
 
