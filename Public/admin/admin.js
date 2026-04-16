@@ -92,6 +92,7 @@ $(function () {
     var addGalleryVideosBtn = $("#addGalleryVideosBtn");
     var addGalleryVideosInput = $("#addGalleryVideosInput");
     var activeVideoFolderBadge = $("#activeVideoFolderBadge");
+    var showAllVideoFoldersBtn = $("#showAllVideoFoldersBtn");
     var createVideoFolderBtn = $("#createVideoFolderBtn");
     var deleteVideoFolderBtn = $("#deleteVideoFolderBtn");
     var newVideoFolderName = $("#newVideoFolderName");
@@ -104,6 +105,7 @@ $(function () {
     var currentGalleryFolderOrder = [];
     var currentVideoFolder = "";
     var currentVideoFolderOrder = [];
+    var showOnlySelectedVideoFolder = false;
     var showOnlySelectedPortfolioFolder = false;
     var currentPortfolioCategory = "printing";
     var currentPortfolioFolder = "";
@@ -1046,6 +1048,8 @@ $(function () {
             galleryFolderCardGrid.removeClass("d-none").html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
+            if (galleryImageGrid.length) galleryImageGrid.addClass("d-none");
+            if (addGalleryImagesBtn.length) addGalleryImagesBtn.addClass("d-none");
             return false;
         }
 
@@ -1071,6 +1075,8 @@ $(function () {
             galleryFolderCardGrid.removeClass("d-none").html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
+            if (galleryImageGrid.length) galleryImageGrid.addClass("d-none");
+            if (addGalleryImagesBtn.length) addGalleryImagesBtn.addClass("d-none");
             return false;
         }
 
@@ -1105,6 +1111,12 @@ $(function () {
             showAllGalleryFoldersBtn.toggleClass("d-none", !(showOnlySelectedGalleryFolder && Boolean(selected)));
         }
         galleryFolderCardGrid.toggleClass("d-none", showOnlySelectedGalleryFolder && Boolean(selected));
+        if (galleryImageGrid.length) {
+            galleryImageGrid.toggleClass("d-none", !(showOnlySelectedGalleryFolder && Boolean(selected)));
+        }
+        if (addGalleryImagesBtn.length) {
+            addGalleryImagesBtn.toggleClass("d-none", !(showOnlySelectedGalleryFolder && Boolean(selected)));
+        }
 
         var cardsHtml = cardsToRender.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
@@ -1191,17 +1203,17 @@ $(function () {
             var imagePath = String((item && item.path) || "");
             var sizeText = formatBytes(item && item.size);
             var createdAt = formatDateTime(item && item.createdAt);
+            
+            var deleteIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
 
             return (
-                '<div class="col-sm-6 col-lg-4 col-xl-3">' +
+                '<div class="col-6 col-sm-3 col-md-2 col-lg-2 col-xl-2">' +
                     '<article class="gallery-image-card" data-file-name="' + fileName + '">' +
                         '<div class="gallery-image-preview">' +
                             '<img src="' + imagePath + "?v=" + cacheBust + '" alt="' + escapeHtml(fileName) + '">' +
                         "</div>" +
-                        '<div class="gallery-image-body">' +
-                            '<p class="gallery-image-name" title="' + escapeHtml(fileName) + '">' + escapeHtml(fileName) + "</p>" +
-                            '<p class="gallery-image-meta">' + escapeHtml(createdAt) + " | " + escapeHtml(sizeText) + "</p>" +
-                            '<button class="btn btn-outline-danger btn-sm btn-gallery-remove" type="button" data-file-name="' + fileName + '">Delete</button>' +
+                        '<div class="gallery-image-body" style="padding: 10px; display: flex; justify-content: center;">' +
+                            '<button class="btn btn-outline-danger btn-sm btn-gallery-remove" type="button" data-file-name="' + fileName + '" title="Delete file" style="padding: 6px 16px;">' + deleteIcon + '</button>' +
                         "</div>" +
                     "</article>" +
                 "</div>"
@@ -1270,10 +1282,16 @@ $(function () {
         if (!list.length) {
             currentVideoFolder = "";
             currentVideoFolderOrder = [];
+            showOnlySelectedVideoFolder = false;
             updateActiveVideoFolderBadge();
-            videoFolderCardGrid.html(
+            if (showAllVideoFoldersBtn.length) {
+                showAllVideoFoldersBtn.addClass("d-none");
+            }
+            videoFolderCardGrid.removeClass("d-none").html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
+            if (videoFileGrid.length) videoFileGrid.addClass("d-none");
+            if (addGalleryVideosBtn.length) addGalleryVideosBtn.addClass("d-none");
             return false;
         }
 
@@ -1291,10 +1309,16 @@ $(function () {
         if (!normalizedCards.length) {
             currentVideoFolder = "";
             currentVideoFolderOrder = [];
+            showOnlySelectedVideoFolder = false;
             updateActiveVideoFolderBadge();
-            videoFolderCardGrid.html(
+            if (showAllVideoFoldersBtn.length) {
+                showAllVideoFoldersBtn.addClass("d-none");
+            }
+            videoFolderCardGrid.removeClass("d-none").html(
                 '<div class="col-12"><div class="banner-empty-state">No folders found.</div></div>'
             );
+            if (videoFileGrid.length) videoFileGrid.addClass("d-none");
+            if (addGalleryVideosBtn.length) addGalleryVideosBtn.addClass("d-none");
             return false;
         }
 
@@ -1311,8 +1335,32 @@ $(function () {
             return item.name;
         });
         updateActiveVideoFolderBadge();
+        
+        var cardsToRender = normalizedCards;
+        if (showOnlySelectedVideoFolder && selected) {
+            cardsToRender = normalizedCards.filter(function (item) {
+                return item.name === selected;
+            });
+            if (!cardsToRender.length) {
+                showOnlySelectedVideoFolder = false;
+                cardsToRender = normalizedCards;
+            }
+        } else {
+            showOnlySelectedVideoFolder = false;
+        }
 
-        var cardsHtml = normalizedCards.map(function (item, index) {
+        if (showAllVideoFoldersBtn.length) {
+            showAllVideoFoldersBtn.toggleClass("d-none", !(showOnlySelectedVideoFolder && Boolean(selected)));
+        }
+        videoFolderCardGrid.toggleClass("d-none", showOnlySelectedVideoFolder && Boolean(selected));
+        if (videoFileGrid.length) {
+            videoFileGrid.toggleClass("d-none", !(showOnlySelectedVideoFolder && Boolean(selected)));
+        }
+        if (addGalleryVideosBtn.length) {
+            addGalleryVideosBtn.toggleClass("d-none", !(showOnlySelectedVideoFolder && Boolean(selected)));
+        }
+
+        var cardsHtml = cardsToRender.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
             var coverMarkup = item.coverPath
                 ? '<video src="' + item.coverPath + '" muted playsinline preload="metadata"></video>'
@@ -1398,17 +1446,17 @@ $(function () {
             var sizeText = formatBytes(item && item.size);
             var createdAt = formatDateTime(item && item.createdAt);
             var previewPath = videoPath + "?v=" + cacheBust;
+            
+            var deleteIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
 
             return (
-                '<div class="col-sm-6 col-lg-4 col-xl-3">' +
+                '<div class="col-6 col-sm-3 col-md-2 col-lg-2 col-xl-2">' +
                     '<article class="gallery-image-card" data-video-name="' + fileName + '">' +
                         '<div class="gallery-image-preview gallery-video-preview">' +
                             '<video src="' + previewPath + '" controls preload="metadata" playsinline></video>' +
                         "</div>" +
-                        '<div class="gallery-image-body">' +
-                            '<p class="gallery-image-name" title="' + escapeHtml(fileName) + '">' + escapeHtml(fileName) + "</p>" +
-                            '<p class="gallery-image-meta">' + escapeHtml(createdAt) + " | " + escapeHtml(sizeText) + "</p>" +
-                            '<button class="btn btn-outline-danger btn-sm btn-video-remove" type="button" data-file-name="' + fileName + '">Delete</button>' +
+                        '<div class="gallery-image-body" style="padding: 10px; display: flex; justify-content: center;">' +
+                            '<button class="btn btn-outline-danger btn-sm btn-video-remove" type="button" data-file-name="' + fileName + '" title="Delete file" style="padding: 6px 16px;">' + deleteIcon + '</button>' +
                         "</div>" +
                     "</article>" +
                 "</div>"
@@ -1482,6 +1530,12 @@ $(function () {
             showAllPortfolioFoldersBtn.toggleClass("d-none", !(showOnlySelectedPortfolioFolder && Boolean(selected)));
         }
         portfolioFolderCardGrid.toggleClass("d-none", showOnlySelectedPortfolioFolder && Boolean(selected));
+        if (portfolioFileGrid.length) {
+            portfolioFileGrid.toggleClass("d-none", !(showOnlySelectedPortfolioFolder && Boolean(selected)));
+        }
+        if (addPortfolioFilesBtn.length) {
+            addPortfolioFilesBtn.toggleClass("d-none", !(showOnlySelectedPortfolioFolder && Boolean(selected)));
+        }
         
         var cardsHtml = cardsToRender.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
@@ -2556,10 +2610,13 @@ $(function () {
             return;
         }
         currentVideoFolder = selected;
-        videoFolderCardGrid.find(".gallery-folder-card-video").removeClass("is-active");
-        $(this).addClass("is-active");
-        updateActiveVideoFolderBadge();
-        loadVideoFiles();
+        showOnlySelectedVideoFolder = true;
+        loadVideoFolderCards(currentVideoFolder);
+    });
+
+    showAllVideoFoldersBtn.on("click", function () {
+        showOnlySelectedVideoFolder = false;
+        loadVideoFolderCards(currentVideoFolder);
     });
 
     videoFolderCardGrid.on("change", ".video-sequence-select", function (e) {
@@ -3636,17 +3693,37 @@ $(function () {
         currentGalleryFolderOrder = [];
         currentVideoFolder = "";
         currentVideoFolderOrder = [];
+        showOnlySelectedVideoFolder = false;
         currentPortfolioFolderOrder = [];
         currentNewsItems = [];
         newsScrollPaused = false;
         activeGalleryFolderBadge.text("Folder: -");
         showAllGalleryFoldersBtn.addClass("d-none");
         galleryFolderCardGrid.removeClass("d-none").html("");
+        if (galleryImageGrid.length) {
+            galleryImageGrid.addClass("d-none").html("");
+        }
+        if (addGalleryImagesBtn.length) {
+            addGalleryImagesBtn.addClass("d-none");
+        }
         if (portfolioFolderCardGrid.length) {
             portfolioFolderCardGrid.removeClass("d-none").html("");
         }
+        if (portfolioFileGrid.length) {
+            portfolioFileGrid.addClass("d-none").html("");
+        }
+        if (addPortfolioFilesBtn.length) {
+            addPortfolioFilesBtn.addClass("d-none");
+        }
         activeVideoFolderBadge.text("Folder: -");
-        videoFolderCardGrid.html("");
+        showAllVideoFoldersBtn.addClass("d-none");
+        videoFolderCardGrid.removeClass("d-none").html("");
+        if (videoFileGrid.length) {
+            videoFileGrid.addClass("d-none").html("");
+        }
+        if (addGalleryVideosBtn.length) {
+            addGalleryVideosBtn.addClass("d-none");
+        }
         newGalleryFolderName.val("");
         newVideoFolderName.val("");
         resetNewsForm();

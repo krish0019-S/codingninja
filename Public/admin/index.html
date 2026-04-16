@@ -259,7 +259,7 @@
                         <span class="badge bg-soft" id="activePortfolioFolderBadge">Folder: -</span>
                         <button class="btn btn-outline-secondary btn-sm d-none" type="button" id="showAllPortfolioFoldersBtn">Show All Folders</button>
                         <input class="d-none" id="addPortfolioFilesInput" type="file" accept="image/jpeg,image/png,video/mp4" multiple>
-                        <button class="btn btn-primary btn-sm" type="button" id="addPortfolioFilesBtn">Upload Files</button>
+                        <button class="btn btn-primary btn-sm d-none" type="button" id="addPortfolioFilesBtn">Upload Files</button>
                     </div>
                 </div>
 
@@ -275,7 +275,7 @@
                     </div>
                 </div>
 
-                <div class="row g-4 mt-1" id="portfolioFileGrid">
+                <div class="row g-4 mt-1 d-none" id="portfolioFileGrid">
                     <div class="col-12">
                         <div class="banner-empty-state">Loading portfolio files...</div>
                     </div>
@@ -336,7 +336,7 @@
                             <button class="btn btn-outline-secondary btn-sm" type="button" id="changeGalleryFolderSequenceBtn">Change Sequence</button>
                         </div>
                         <input class="d-none" id="addGalleryImagesInput" type="file" accept="image/jpeg,image/png" multiple>
-                        <button class="btn btn-primary btn-sm" type="button" id="addGalleryImagesBtn">Upload Images</button>
+                        <button class="btn btn-primary btn-sm d-none" type="button" id="addGalleryImagesBtn">Upload Images</button>
                     </div>
                 </div>
 
@@ -352,7 +352,7 @@
                     </div>
                 </div>
 
-                <div class="row g-4" id="galleryImageGrid">
+                <div class="row g-4 d-none" id="galleryImageGrid">
                     <div class="col-12">
                         <div class="banner-empty-state">Loading image folder...</div>
                     </div>
@@ -375,12 +375,13 @@
                     <h2 class="manager-title">Gallery Video Files</h2>
                     <div class="manager-actions">
                         <span class="badge bg-soft" id="activeVideoFolderBadge">Folder: -</span>
+                        <button class="btn btn-outline-secondary btn-sm d-none" type="button" id="showAllVideoFoldersBtn">Show All Folders</button>
                         <div class="sequence-controls d-none" id="videoFolderSequenceWrap">
                             <select class="form-select form-select-sm" id="videoFolderSequenceSelect" aria-label="Video folder sequence"></select>
                             <button class="btn btn-outline-secondary btn-sm" type="button" id="changeVideoFolderSequenceBtn">Change Sequence</button>
                         </div>
                         <input class="d-none" id="addGalleryVideosInput" type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" multiple>
-                        <button class="btn btn-primary btn-sm" type="button" id="addGalleryVideosBtn">Upload Videos</button>
+                        <button class="btn btn-primary btn-sm d-none" type="button" id="addGalleryVideosBtn">Upload Videos</button>
                     </div>
                 </div>
 
@@ -396,7 +397,7 @@
                     </div>
                 </div>
 
-                <div class="row g-4" id="videoFileGrid">
+                <div class="row g-4 d-none" id="videoFileGrid">
                     <div class="col-12">
                         <div class="banner-empty-state">Loading video folder...</div>
                     </div>
