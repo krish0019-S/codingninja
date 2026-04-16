@@ -180,7 +180,7 @@
             <div class="gallery-browser-head">
                 <h2 data-public-browser-title>Project Folders</h2>
                 <p data-public-browser-subtitle>Open a folder to view our work.</p>
-                <a class="gallery-folder-back-link" data-public-folder-back href="#" hidden>Back to folders</a>
+                <a class="gallery-folder-back-link" data-public-folder-back href="#" hidden>← Back to All Folders</a>
             </div>
             <div class="gallery-folder-grid" data-public-folder-grid>
                 <div class="gallery-empty-state">Loading folders...</div>
@@ -195,6 +195,8 @@
             <div class="gallery-lightbox-backdrop" data-lightbox-close></div>
             <div class="gallery-lightbox-panel">
                 <button class="gallery-lightbox-close" type="button" data-lightbox-close aria-label="Close preview">&times;</button>
+                <button class="gallery-lightbox-nav gallery-lightbox-prev" type="button" data-lightbox-prev aria-label="Previous media" style="position: fixed; left: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; width: 48px; height: 48px; border-radius: 50%; font-size: 24px; cursor: pointer; z-index: 1050; line-height: 48px; padding: 0; text-align: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.9)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'" hidden>&#10094;</button>
+                <button class="gallery-lightbox-nav gallery-lightbox-next" type="button" data-lightbox-next aria-label="Next media" style="position: fixed; right: 20px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; width: 48px; height: 48px; border-radius: 50%; font-size: 24px; cursor: pointer; z-index: 1050; line-height: 48px; padding: 0; text-align: center; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.9)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'" hidden>&#10095;</button>
                 <div class="gallery-lightbox-media-container" style="text-align: center;"></div>
                 <div class="gallery-lightbox-info">
                     <h4 data-lightbox-title></h4>

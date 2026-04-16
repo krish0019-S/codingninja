@@ -178,8 +178,13 @@
         var publicBrowserTitle = document.querySelector("[data-public-browser-title]");
         var publicBrowserSubtitle = document.querySelector("[data-public-browser-subtitle]");
         var publicFolderBack = document.querySelector("[data-public-folder-back]");
+        var publicFolderPrev = document.querySelector("[data-public-folder-prev]");
+        var publicFolderNext = document.querySelector("[data-public-folder-next]");
         
         var currentPublicFolder = String(new URLSearchParams(window.location.search).get("folder") || "").trim().toLowerCase();
+        var publicFolderOrder = [];
+        var currentPublicFiles = [];
+        var currentLightboxIndex = -1;
 
         var escapeHtml = function (text) {
             return String(text == null ? "" : text)
@@ -194,11 +199,26 @@
             return String(value || "").trim().replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
         };
 
+        var updatePublicFolderNav = function () {
+            if (!publicFolderPrev || !publicFolderNext) return;
+            var isFolderView = !!currentPublicFolder;
+            var folderCount = publicFolderOrder.length;
+            if (!isFolderView || folderCount <= 1) {
+                publicFolderPrev.hidden = true;
+                publicFolderNext.hidden = true;
+                return;
+            }
+            var currentIndex = publicFolderOrder.findIndex(function(name) { return name.toLowerCase() === currentPublicFolder.toLowerCase(); });
+            publicFolderPrev.hidden = false;
+            publicFolderNext.hidden = false;
+            publicFolderPrev.toggleAttribute("disabled", currentIndex <= 0);
+            publicFolderNext.toggleAttribute("disabled", currentIndex >= folderCount - 1);
+        };
+
         var setPublicViewMode = function (mode, folderName) {
             var isFolderView = mode === "folder";
             if (publicFolderGrid) publicFolderGrid.hidden = isFolderView;
             if (publicImageGrid) publicImageGrid.hidden = !isFolderView;
-            if (publicSelectedFolder) publicSelectedFolder.hidden = !isFolderView;
             if (publicFolderBack) publicFolderBack.hidden = !isFolderView;
             
             if (publicBrowserTitle) {
@@ -208,6 +228,7 @@
                 publicBrowserSubtitle.textContent = isFolderView ? "Showing media uploaded in this folder." : "Open a folder to view our work.";
             }
             if (publicSelectedFolder) {
+                publicSelectedFolder.hidden = !isFolderView;
                 publicSelectedFolder.textContent = isFolderView ? "Folder: " + prettifyName(folderName) : "Folder: -";
             }
             if (publicFolderBack) {
@@ -215,6 +236,7 @@
                 url.searchParams.delete("folder");
                 publicFolderBack.href = url.toString();
             }
+            updatePublicFolderNav();
         };
 
         if (publicFolderBack) {
@@ -228,12 +250,47 @@
             });
         }
 
+        var navigatePublicFolder = function (direction) {
+            if (!currentPublicFolder || publicFolderOrder.length <= 1) return;
+            var currentIndex = publicFolderOrder.findIndex(function(name) {
+                return name.toLowerCase() === currentPublicFolder.toLowerCase();
+            });
+            if (currentIndex === -1) return;
+            
+            var nextIndex = currentIndex + direction;
+            if (nextIndex < 0 || nextIndex >= publicFolderOrder.length) return;
+            
+            var nextFolder = publicFolderOrder[nextIndex];
+            if (nextFolder) {
+                var url = new URL(window.location.href);
+                url.searchParams.set("folder", nextFolder);
+                window.history.pushState({}, "", url);
+                currentPublicFolder = nextFolder;
+                loadPortfolioFiles(nextFolder);
+            }
+        };
+
+        if (publicFolderPrev) {
+            publicFolderPrev.addEventListener("click", function(e) {
+                e.preventDefault();
+                if (this.hasAttribute("disabled")) return;
+                navigatePublicFolder(-1);
+            });
+        }
+        if (publicFolderNext) {
+            publicFolderNext.addEventListener("click", function(e) {
+                e.preventDefault();
+                if (this.hasAttribute("disabled")) return;
+                navigatePublicFolder(1);
+            });
+        }
+
         var loadPortfolioFiles = function (folderName) {
             if (!folderName) return;
             fetch("/admin/portfolio-files-public?category=" + encodeURIComponent(portfolioCategory) + "&folder=" + encodeURIComponent(folderName))
                 .then(function(res) { return res.json(); })
                 .then(function(data) {
-                    if (!data.ok) throw new Error(data.message);
+                    if (!data.ok) throw new Error(data.message || "Unable to load files.");
                     setPublicViewMode("folder", folderName);
                     
                     var files = data.files || [];
@@ -242,7 +299,9 @@
                         return;
                     }
                     
-                    var cards = files.map(function (item) {
+                    currentPublicFiles = files;
+                    
+                    var cards = files.map(function (item, index) {
                         var filePath = String(item.path || "");
                         var fileName = String(item.name || "");
                         var title = prettifyName(fileName);
@@ -254,7 +313,7 @@
                             
                         return (
                             '<article class="gallery-card gallery-card-public' + (isVideo ? ' gallery-video-card' : '') + '">' +
-                                '<button class="gallery-open" type="button" data-lightbox-open data-full="' + escapeHtml(filePath) + '" data-title="' + escapeHtml(title) + '" data-meta="' + escapeHtml(folderName) + '" data-type="' + (isVideo ? 'video' : 'image') + '">' +
+                                '<button class="gallery-open" type="button" data-lightbox-open data-index="' + index + '">' +
                                     (isVideo ? '<div class="gallery-video-frame">' + mediaMarkup + '</div>' : mediaMarkup) +
                                     '<span class="gallery-overlay"><span>' + escapeHtml(folderName) + '</span></span>' +
                                 '</button>' +
@@ -265,6 +324,7 @@
                     publicImageGrid.innerHTML = cards;
                 })
                 .catch(function(err) {
+                    currentPublicFiles = [];
                     publicImageGrid.innerHTML = '<div class="gallery-empty-state">Unable to load files.</div>';
                 });
         };
@@ -273,8 +333,9 @@
             fetch("/admin/portfolio-folders-public?category=" + encodeURIComponent(portfolioCategory))
                 .then(function(res) { return res.json(); })
                 .then(function(data) {
-                    if (!data.ok) throw new Error(data.message);
+                    if (!data.ok) throw new Error(data.message || "Unable to load folders.");
                     var folders = data.folders || [];
+                    publicFolderOrder = folders.map(function(item) { return item.name; });
                     if (!folders.length) {
                         publicFolderGrid.innerHTML = '<div class="gallery-empty-state">No folders available right now.</div>';
                         return;
@@ -342,30 +403,53 @@
             var lightboxTitle = lightbox.querySelector("[data-lightbox-title]");
             var lightboxMeta = lightbox.querySelector("[data-lightbox-meta]");
             var lightboxCloses = lightbox.querySelectorAll("[data-lightbox-close]");
+            var lightboxPrev = lightbox.querySelector("[data-lightbox-prev]");
+            var lightboxNext = lightbox.querySelector("[data-lightbox-next]");
+
+            var showLightboxItem = function (index) {
+                if (index < 0 || index >= currentPublicFiles.length) {
+                    return;
+                }
+                currentLightboxIndex = index;
+                var item = currentPublicFiles[index];
+                var filePath = String(item.path || "");
+                var fileName = String(item.name || "");
+                var title = prettifyName(fileName);
+                var isVideo = fileName.toLowerCase().endsWith(".mp4");
+
+                if (lightboxContainer) {
+                    if (isVideo) {
+                        lightboxContainer.innerHTML = '<video src="' + escapeHtml(filePath) + '" controls autoplay style="max-width:100%; max-height:80vh; outline:none; border-radius:8px;"></video>';
+                    } else {
+                        lightboxContainer.innerHTML = '<img src="' + escapeHtml(filePath) + '" alt="' + escapeHtml(title) + '" data-lightbox-image>';
+                    }
+                }
+                if (lightboxTitle) lightboxTitle.textContent = title;
+                if (lightboxMeta) lightboxMeta.textContent = currentPublicFolder;
+
+                if (lightboxPrev && lightboxNext) {
+                    lightboxPrev.hidden = false;
+                    lightboxNext.hidden = false;
+                    lightboxPrev.disabled = currentLightboxIndex === 0;
+                    lightboxNext.disabled = currentLightboxIndex === currentPublicFiles.length - 1;
+                }
+            };
 
             var closeLightbox = function () {
                 lightbox.classList.remove("is-open");
                 lightbox.setAttribute("aria-hidden", "true");
                 document.body.classList.remove("gallery-lightbox-open");
                 if (lightboxContainer) lightboxContainer.innerHTML = "";
+                currentLightboxIndex = -1;
             };
 
             var openLightbox = function (trigger) {
-                var fullMedia = trigger.dataset.full || "";
-                var title = trigger.dataset.title || "";
-                var meta = trigger.dataset.meta || "";
-                var type = trigger.dataset.type || "image";
-
-                if (lightboxContainer) {
-                    if (type === "video") {
-                        lightboxContainer.innerHTML = '<video src="' + escapeHtml(fullMedia) + '" controls autoplay style="max-width:100%; max-height:80vh; outline:none; border-radius:8px;"></video>';
-                    } else {
-                        lightboxContainer.innerHTML = '<img src="' + escapeHtml(fullMedia) + '" alt="' + escapeHtml(title) + '" data-lightbox-image>';
-                    }
+                var index = Number(trigger.dataset.index);
+                if (isNaN(index) || index < 0 || index >= currentPublicFiles.length) {
+                    return;
                 }
-                
-                if (lightboxTitle) lightboxTitle.textContent = title;
-                if (lightboxMeta) lightboxMeta.textContent = meta;
+
+                showLightboxItem(index);
 
                 lightbox.classList.add("is-open");
                 lightbox.setAttribute("aria-hidden", "false");
@@ -374,16 +458,37 @@
 
             document.addEventListener("click", function (event) {
                 var trigger = event.target.closest("[data-lightbox-open]");
-                if (trigger) openLightbox(trigger);
+                if (trigger) {
+                    event.preventDefault();
+                    openLightbox(trigger);
+                }
             });
 
             lightboxCloses.forEach(function (closer) {
                 closer.addEventListener("click", closeLightbox);
             });
 
+            if (lightboxPrev) {
+                lightboxPrev.addEventListener("click", function() {
+                    if (currentLightboxIndex > 0) showLightboxItem(currentLightboxIndex - 1);
+                });
+            }
+
+            if (lightboxNext) {
+                lightboxNext.addEventListener("click", function() {
+                    if (currentLightboxIndex < currentPublicFiles.length - 1) showLightboxItem(currentLightboxIndex + 1);
+                });
+            }
+
             document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape" && lightbox.classList.contains("is-open")) {
+                if (lightbox.classList.contains("is-open")) {
+                    if (event.key === "Escape") {
                     closeLightbox();
+                    } else if (event.key === "ArrowLeft") {
+                        if (lightboxPrev) lightboxPrev.click();
+                    } else if (event.key === "ArrowRight") {
+                        if (lightboxNext) lightboxNext.click();
+                    }
                 }
             });
         }
