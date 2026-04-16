@@ -113,7 +113,6 @@ $(function () {
     var currentPortfolioCategory = "printing";
     var currentPortfolioFolder = "";
     var currentPortfolioFolderOrder = [];
-    var currentPortfolioCoverFileName = "";
     var dashboardMetrics = {
         videos: 0,
         images: 0,
@@ -1630,13 +1629,12 @@ $(function () {
         loadPortfolioFolderCards("");
     });
 
-    var renderPortfolioFiles = function (items, coverFileName) {
+    var renderPortfolioFiles = function (items) {
         if (!Array.isArray(items) || !items.length) {
             renderPortfolioFileEmptyState("No files found in this folder.");
             return;
         }
         
-        var coverName = String(coverFileName || "").trim();
         var cacheBust = Date.now();
         var cards = items.map(function (item, index) {
             var fileName = String((item && item.name) || "");
@@ -1653,13 +1651,8 @@ $(function () {
                 : '<img src="' + previewUrl + '" alt="' + escapeHtml(fileName) + '">';
                 
             var deleteIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
-            var editIcon = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
-            var saveIcon = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display: block;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-            var cancelIcon = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-            var coverIcon = '<svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"></path></svg>';
             var prettyName = prettifyFileName(fileName);
             var sequenceOptions = buildSequenceOptions(items.length, index + 1);
-            var isCover = coverName && coverName === fileName;
                 
             return (
                 '<div class="col-6 col-sm-4 col-md-3">' +
@@ -1667,21 +1660,8 @@ $(function () {
                         '<div class="gallery-image-preview portfolio-file-preview' + (isVideo ? ' gallery-video-preview' : '') + '">' +
                             mediaHtml +
                             '<div class="portfolio-file-overlay">' +
-                                '<div class="portfolio-file-overlay-top">' +
-                                    '<button class="btn btn-sm btn-light portfolio-file-action-btn btn-portfolio-set-cover' + (isCover ? ' is-active' : '') + '" type="button" title="Set folder cover" data-file-name="' + escapeHtml(fileName) + '">' + coverIcon + '</button>' +
-                                    '<button class="btn btn-sm btn-light portfolio-file-action-btn btn-edit-portfolio-file" type="button" title="Edit name">' + editIcon + '</button>' +
-                                '</div>' +
                                 '<div class="portfolio-file-overlay-bottom">' +
-                                    '<div class="portfolio-file-name-display">' +
-                                        '<div class="portfolio-file-title" title="' + escapeHtml(prettyName) + '">' + escapeHtml(prettyName) + '</div>' +
-                                    '</div>' +
-                                    '<div class="portfolio-file-name-edit" style="display:none;">' +
-                                        '<div class="input-group input-group-sm">' +
-                                            '<input type="text" class="form-control portfolio-file-name-input" value="' + escapeHtml(prettyName) + '">' +
-                                            '<button class="btn btn-success btn-save-portfolio-file" type="button" title="Save name">' + saveIcon + '</button>' +
-                                            '<button class="btn btn-outline-light btn-cancel-portfolio-file" type="button" title="Cancel">' + cancelIcon + '</button>' +
-                                        '</div>' +
-                                    '</div>' +
+                                    '<div class="portfolio-file-title" title="' + escapeHtml(prettyName) + '">' + escapeHtml(prettyName) + '</div>' +
                                 '</div>' +
                             '</div>' +
                         '</div>' +
@@ -1719,8 +1699,7 @@ $(function () {
                 var serverFolder = normalizeFolderName(response && response.folder);
                 if (serverFolder) currentPortfolioFolder = serverFolder;
                 updateActivePortfolioFolderBadge();
-                currentPortfolioCoverFileName = String((response && response.coverFileName) || "").trim();
-                renderPortfolioFiles((response && response.files) || [], currentPortfolioCoverFileName);
+                renderPortfolioFiles((response && response.files) || []);
             },
             error: function (xhr) {
                 if (handleAuthError(xhr)) return;
@@ -3645,58 +3624,6 @@ $(function () {
         });
     });
 
-    portfolioFileGrid.on("click", ".btn-edit-portfolio-file", function() {
-        var card = $(this).closest(".gallery-image-card");
-        card.find(".portfolio-file-name-display").hide();
-        card.find(".portfolio-file-name-edit").css("display", "block");
-        card.find(".portfolio-file-name-input").trigger("focus").trigger("select");
-    });
-
-    portfolioFileGrid.on("click", ".btn-cancel-portfolio-file", function() {
-        var card = $(this).closest(".gallery-image-card");
-        card.find(".portfolio-file-name-edit").hide();
-        card.find(".portfolio-file-name-display").show();
-    });
-
-    portfolioFileGrid.on("click", ".btn-save-portfolio-file", function() {
-        if (!ensureAuth()) return;
-        var card = $(this).closest(".gallery-image-card");
-        var oldName = card.data("fileName");
-        var newNameBase = card.find(".portfolio-file-name-input").val().trim();
-
-        if (!newNameBase) {
-            showAlert("File name cannot be empty.", "danger");
-            return;
-        }
-
-        var button = $(this);
-        button.prop("disabled", true);
-
-        $.ajax({
-            url: "/admin/portfolio-files/rename",
-            method: "POST",
-            contentType: "application/json",
-            headers: getAuthHeaders(),
-            data: JSON.stringify({
-                category: currentPortfolioCategory,
-                folder: currentPortfolioFolder,
-                oldName: oldName,
-                newName: newNameBase
-            }),
-            success: function(response) {
-                showAlert("File renamed successfully.", "success");
-                currentPortfolioCoverFileName = String((response && response.coverFileName) || "").trim();
-                renderPortfolioFiles(response.files || [], currentPortfolioCoverFileName);
-            },
-            error: function(xhr) {
-                if (handleAuthError(xhr)) return;
-                var msg = (xhr.responseJSON && xhr.responseJSON.message) || "Unable to rename file.";
-                showAlert(msg, "danger");
-                button.prop("disabled", false);
-            },
-        });
-    });
-
     portfolioFileGrid.on("change", ".portfolio-file-sequence-select", function() {
         if (!ensureAuth()) return;
         
@@ -3720,8 +3647,7 @@ $(function () {
             data: JSON.stringify({ category: currentPortfolioCategory, folder: currentPortfolioFolder, fileName: fileName, sequence: sequence }),
             success: function(response) {
                 showAlert("Sequence updated.", "success");
-                currentPortfolioCoverFileName = String((response && response.coverFileName) || "").trim();
-                renderPortfolioFiles(response.files || [], currentPortfolioCoverFileName);
+                renderPortfolioFiles(response.files || []);
             },
             error: function(xhr) {
                 if (handleAuthError(xhr)) return;
@@ -3729,39 +3655,6 @@ $(function () {
                 showAlert(msg, "danger");
                 select.prop("disabled", false);
             }
-        });
-    });
-
-    portfolioFileGrid.on("click", ".btn-portfolio-set-cover", function () {
-        if (!ensureAuth()) return;
-
-        var button = $(this);
-        var fileName = String(button.data("fileName") || "").trim();
-        var folderName = normalizeFolderName(currentPortfolioFolder);
-        if (!fileName || !folderName) {
-            showAlert("Invalid file or folder.", "danger");
-            return;
-        }
-
-        button.prop("disabled", true);
-
-        $.ajax({
-            url: "/admin/portfolio-folders/cover",
-            method: "POST",
-            contentType: "application/json",
-            headers: getAuthHeaders(),
-            data: JSON.stringify({ category: currentPortfolioCategory, folder: folderName, fileName: fileName }),
-            success: function (response) {
-                currentPortfolioCoverFileName = String((response && response.coverFileName) || fileName).trim();
-                showAlert(response.message || "Folder cover updated successfully.", "success");
-                loadPortfolioFolderCards(currentPortfolioFolder);
-            },
-            error: function (xhr) {
-                if (handleAuthError(xhr)) return;
-                var msg = (xhr.responseJSON && xhr.responseJSON.message) || "Unable to update folder cover.";
-                showAlert(msg, "danger");
-                button.prop("disabled", false);
-            },
         });
     });
 

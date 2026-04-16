@@ -1812,31 +1812,6 @@ body.admin-body.is-ready .admin-layout {
     pointer-events: none;
 }
 
-.portfolio-file-overlay-top {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    padding: 10px;
-    pointer-events: auto;
-}
-
-.portfolio-file-action-btn {
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    line-height: 1;
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
-}
-
-.portfolio-file-action-btn.is-active {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: #fff;
-}
-
 .portfolio-file-overlay-bottom {
     pointer-events: auto;
     padding: 12px 10px 10px;
