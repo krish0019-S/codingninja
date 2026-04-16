@@ -27,6 +27,7 @@ $(function () {
     var portfolioSection = $("#portfolioSection");
     var portfolioCategorySelect = $("#portfolioCategorySelect");
     var activePortfolioFolderBadge = $("#activePortfolioFolderBadge");
+    var showAllPortfolioFoldersBtn = $("#showAllPortfolioFoldersBtn");
     var addPortfolioFilesBtn = $("#addPortfolioFilesBtn");
     var addPortfolioFilesInput = $("#addPortfolioFilesInput");
     var newPortfolioFolderName = $("#newPortfolioFolderName");
@@ -103,6 +104,7 @@ $(function () {
     var currentGalleryFolderOrder = [];
     var currentVideoFolder = "";
     var currentVideoFolderOrder = [];
+    var showOnlySelectedPortfolioFolder = false;
     var currentPortfolioCategory = "printing";
     var currentPortfolioFolder = "";
     var currentPortfolioFolderOrder = [];
@@ -1462,7 +1464,24 @@ $(function () {
         currentPortfolioFolderOrder = normalizedCards.map(function(item) { return item.name; });
         updateActivePortfolioFolderBadge();
         
-        var cardsHtml = normalizedCards.map(function (item, index) {
+        var cardsToRender = normalizedCards;
+        if (showOnlySelectedPortfolioFolder && selected) {
+            cardsToRender = normalizedCards.filter(function (item) {
+                return item.name === selected;
+            });
+            if (!cardsToRender.length) {
+                showOnlySelectedPortfolioFolder = false;
+                cardsToRender = normalizedCards;
+            }
+        } else {
+            showOnlySelectedPortfolioFolder = false;
+        }
+
+        if (showAllPortfolioFoldersBtn.length) {
+            showAllPortfolioFoldersBtn.toggleClass("d-none", !(showOnlySelectedPortfolioFolder && Boolean(selected)));
+        }
+        
+        var cardsHtml = cardsToRender.map(function (item, index) {
             var activeClass = item.name === selected ? " is-active" : "";
             var coverMarkup = '<span class="gallery-folder-placeholder">No Media</span>';
             if (item.coverPath) {
@@ -1560,14 +1579,14 @@ $(function () {
                 ? '<video src="' + previewUrl + '" controls preload="metadata" playsinline></video>'
                 : '<img src="' + previewUrl + '" alt="' + escapeHtml(fileName) + '">';
                 
+            var deleteIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+                
             return (
-                '<div class="col-sm-6 col-lg-4 col-xl-3">' +
+                '<div class="col-6 col-sm-3 col-md-2 col-lg-2 col-xl-2">' +
                     '<article class="gallery-image-card" data-file-name="' + fileName + '">' +
                         '<div class="gallery-image-preview' + (isVideo ? ' gallery-video-preview' : '') + '">' + mediaHtml + '</div>' +
-                        '<div class="gallery-image-body">' +
-                            '<p class="gallery-image-name" title="' + escapeHtml(fileName) + '">' + escapeHtml(fileName) + '</p>' +
-                            '<p class="gallery-image-meta">' + escapeHtml(createdAt) + ' | ' + escapeHtml(sizeText) + '</p>' +
-                            '<button class="btn btn-outline-danger btn-sm btn-portfolio-remove" type="button" data-file-name="' + fileName + '">Delete</button>' +
+                        '<div class="gallery-image-body" style="padding: 10px; display: flex; justify-content: center;">' +
+                            '<button class="btn btn-outline-danger btn-sm btn-portfolio-remove" type="button" data-file-name="' + fileName + '" title="Delete file" style="padding: 6px 16px;">' + deleteIcon + '</button>' +
                         '</div>' +
                     '</article>' +
                 '</div>'
@@ -2540,6 +2559,7 @@ $(function () {
         updateActiveVideoFolderBadge();
         loadVideoFiles();
     });
+
     videoFolderCardGrid.on("change", ".video-sequence-select", function (e) {
         e.stopPropagation();
         if (!ensureAuth()) {
@@ -3330,10 +3350,13 @@ $(function () {
             return;
         }
         currentPortfolioFolder = selected;
-        portfolioFolderCardGrid.find(".gallery-folder-card-portfolio").removeClass("is-active");
-        $(this).addClass("is-active");
-        updateActivePortfolioFolderBadge();
-        loadPortfolioFiles();
+        showOnlySelectedPortfolioFolder = true;
+        loadPortfolioFolderCards(currentPortfolioFolder);
+    });
+
+    showAllPortfolioFoldersBtn.on("click", function () {
+        showOnlySelectedPortfolioFolder = false;
+        loadPortfolioFolderCards(currentPortfolioFolder);
     });
     portfolioFolderCardGrid.on("change", ".portfolio-sequence-select", function (e) {
         e.stopPropagation();
@@ -3605,6 +3628,7 @@ $(function () {
         }
         closeSidebarMenu();
         clearAuth();
+        showOnlySelectedPortfolioFolder = false;
         currentGalleryFolder = "";
         showOnlySelectedGalleryFolder = false;
         currentGalleryFolderOrder = [];
