@@ -1222,7 +1222,7 @@ $(function () {
             var deleteIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
 
             return (
-                '<div class="col-6 col-sm-3 col-md-2 col-lg-2 col-xl-2">' +
+                '<div class="col-auto" style="width: 280px; max-width: 100%;">' +
                     '<article class="gallery-image-card" data-file-name="' + fileName + '">' +
                         '<div class="gallery-image-preview">' +
                             '<img src="' + imagePath + "?v=" + cacheBust + '" alt="' + escapeHtml(fileName) + '">' +
@@ -1465,7 +1465,7 @@ $(function () {
             var deleteIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
 
             return (
-                '<div class="col-6 col-sm-3 col-md-2 col-lg-2 col-xl-2">' +
+                '<div class="col-auto" style="width: 280px; max-width: 100%;">' +
                     '<article class="gallery-image-card" data-video-name="' + fileName + '">' +
                         '<div class="gallery-image-preview gallery-video-preview">' +
                             '<video src="' + previewPath + '" controls preload="metadata" playsinline></video>' +
@@ -1483,11 +1483,16 @@ $(function () {
 
     var updateActivePortfolioFolderBadge = function () {
         if (!activePortfolioFolderBadge.length) return;
-        if (!currentPortfolioFolder) {
-            activePortfolioFolderBadge.text("Folder: -");
+        var category = currentPortfolioCategory || "printing";
+        if (!currentPortfolioFolder || !showOnlySelectedPortfolioFolder) {
+            var displayCategory = category.charAt(0).toUpperCase() + category.slice(1);
+            activePortfolioFolderBadge.text("./portfolio/" + displayCategory);
             return;
         }
-        activePortfolioFolderBadge.text("Folder: " + currentPortfolioFolder);
+        activePortfolioFolderBadge.html(
+            "./portfolio/" + escapeHtml(category.toLowerCase()) + "/" +
+            '<a href="#" class="portfolio-breadcrumb-back" style="color: inherit; text-decoration: underline; cursor: pointer;" title="Back to all folders">' + escapeHtml(currentPortfolioFolder) + '</a>'
+        );
     };
 
     var renderPortfolioFolderCards = function (folders, preferredFolder) {
@@ -1526,7 +1531,6 @@ $(function () {
         
         currentPortfolioFolder = selected;
         currentPortfolioFolderOrder = normalizedCards.map(function(item) { return item.name; });
-        updateActivePortfolioFolderBadge();
         
         var cardsToRender = normalizedCards;
         if (showOnlySelectedPortfolioFolder && selected) {
@@ -1541,8 +1545,10 @@ $(function () {
             showOnlySelectedPortfolioFolder = false;
         }
 
+        updateActivePortfolioFolderBadge();
+
         if (showAllPortfolioFoldersBtn.length) {
-            showAllPortfolioFoldersBtn.toggleClass("d-none", !(showOnlySelectedPortfolioFolder && Boolean(selected)));
+            showAllPortfolioFoldersBtn.addClass("d-none");
         }
         portfolioFolderCardGrid.toggleClass("d-none", showOnlySelectedPortfolioFolder && Boolean(selected));
         if (portfolioFileGrid.length) {
@@ -1626,6 +1632,7 @@ $(function () {
 
     portfolioCategorySelect.on("change", function() {
         currentPortfolioFolder = "";
+        showOnlySelectedPortfolioFolder = false;
         loadPortfolioFolderCards("");
     });
 
@@ -1655,7 +1662,7 @@ $(function () {
             var sequenceOptions = buildSequenceOptions(items.length, index + 1);
                 
             return (
-                '<div class="col-6 col-sm-4 col-md-3">' +
+                '<div class="col-auto" style="width: 280px; max-width: 100%;">' +
                     '<article class="gallery-image-card" data-file-name="' + escapeHtml(fileName) + '">' +
                         '<div class="gallery-image-preview portfolio-file-preview' + (isVideo ? ' gallery-video-preview' : '') + '">' +
                             mediaHtml +
@@ -3572,7 +3579,8 @@ $(function () {
         loadPortfolioFolderCards(currentPortfolioFolder);
     });
 
-    showAllPortfolioFoldersBtn.on("click", function () {
+    activePortfolioFolderBadge.on("click", ".portfolio-breadcrumb-back", function (e) {
+        e.preventDefault();
         showOnlySelectedPortfolioFolder = false;
         loadPortfolioFolderCards(currentPortfolioFolder);
     });
