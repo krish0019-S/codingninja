@@ -177,6 +177,7 @@
         var publicSelectedFolder = document.querySelector("[data-public-selected-folder]");
         var publicBrowserTitle = document.querySelector("[data-public-browser-title]");
         var publicBrowserSubtitle = document.querySelector("[data-public-browser-subtitle]");
+        var publicFolderBack = document.querySelector("[data-public-folder-back]");
         var publicFolderPrev = document.querySelector("[data-public-folder-prev]");
         var publicFolderNext = document.querySelector("[data-public-folder-next]");
         
@@ -218,6 +219,15 @@
             var isFolderView = mode === "folder";
             if (publicFolderGrid) publicFolderGrid.hidden = isFolderView;
             if (publicImageGrid) publicImageGrid.hidden = !isFolderView;
+            if (publicFolderBack) {
+            publicFolderBack.hidden = portfolioCategory === "printing" ? true : !isFolderView;
+            if (portfolioCategory === "printing") {
+                publicFolderBack.style.display = "none";
+            }
+                var url = new URL(window.location.href);
+                url.searchParams.delete("folder");
+                publicFolderBack.href = url.toString();
+            }
             
             if (publicBrowserTitle) {
                 publicBrowserTitle.textContent = isFolderView ? prettifyName(folderName) + " Folder" : "Project Folders";
@@ -231,6 +241,33 @@
             }
             updatePublicFolderNav();
         };
+
+        var resetPublicFolderView = function (event) {
+            if (event && typeof event.preventDefault === "function") {
+                event.preventDefault();
+            }
+            var url = new URL(window.location.href);
+            url.searchParams.delete("folder");
+            window.history.pushState({}, "", url);
+            setPublicViewMode("folders", "");
+            currentPublicFolder = "";
+        };
+
+        if (publicFolderBack) {
+            publicFolderBack.addEventListener("click", resetPublicFolderView);
+        }
+
+        var publicFolderResetTriggers = document.querySelectorAll("[data-public-folder-reset]");
+        if (publicFolderResetTriggers && publicFolderResetTriggers.length) {
+            publicFolderResetTriggers.forEach(function (trigger) {
+                trigger.addEventListener("click", function (event) {
+                    if (!currentPublicFolder) {
+                        return;
+                    }
+                    resetPublicFolderView(event);
+                });
+            });
+        }
 
         var navigatePublicFolder = function (direction) {
             if (!currentPublicFolder || publicFolderOrder.length <= 1) return;

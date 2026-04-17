@@ -1659,13 +1659,9 @@ $(function () {
                     '<article class="gallery-image-card" data-file-name="' + escapeHtml(fileName) + '">' +
                         '<div class="gallery-image-preview portfolio-file-preview' + (isVideo ? ' gallery-video-preview' : '') + '">' +
                             mediaHtml +
-                            '<div class="portfolio-file-overlay">' +
-                                '<div class="portfolio-file-overlay-bottom">' +
-                                    '<div class="portfolio-file-title" title="' + escapeHtml(prettyName) + '">' + escapeHtml(prettyName) + '</div>' +
-                                '</div>' +
-                            '</div>' +
                         '</div>' +
                         '<div class="gallery-image-body" style="padding: 10px; display: grid; gap: 8px; text-align: center;">' +
+                            '<div class="portfolio-file-title" title="' + escapeHtml(prettyName) + '" style="font-size: 13px; font-weight: 600; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">' + escapeHtml(prettyName) + '</div>' +
                             '<div class="portfolio-file-actions" style="display: flex; gap: 8px; justify-content: center;">' +
                                 '<select class="form-select form-select-sm portfolio-file-sequence-select" title="Change sequence" style="width: auto;">' + sequenceOptions + '</select>' +
                                 '<button class="btn btn-outline-danger btn-sm btn-portfolio-remove" type="button" data-file-name="' + escapeHtml(fileName) + '" title="Delete file" style="padding: 4px 8px;">' + deleteIcon + '</button>' +
