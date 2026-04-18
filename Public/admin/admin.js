@@ -3530,6 +3530,9 @@ $(function () {
         }
     });
 
+
+
+ 
     deletePortfolioFolderBtn.on("click", function () {
         if (!ensureAuth()) return;
         
