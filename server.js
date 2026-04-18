@@ -165,17 +165,19 @@ var countGalleryStats = async function (rootDir, allowedExts) {
 
 var countPortfolioStats = async function () {
     var stats = {};
-    for (var i = 0; i < PORTFOLIO_CATEGORIES.length; i++) {
-        var category = PORTFOLIO_CATEGORIES[i];
-        var categoryDir = path.join(PORTFOLIO_ROOT_DIR, category);
-        try {
-            await fs.promises.mkdir(categoryDir, { recursive: true });
-            var categoryStats = await countGalleryStats(categoryDir, PORTFOLIO_FILE_EXTS);
-            stats[category] = categoryStats.fileCount || 0;
-        } catch (error) {
-            stats[category] = 0;
+    PORTFOLIO_CATEGORIES.forEach(function(cat) { stats[cat] = 0; });
+    try {
+        var dbPath = path.join(__dirname, "data", "portfolio-db.json");
+        var raw = await fs.promises.readFile(dbPath, "utf8");
+        var files = JSON.parse(raw);
+        if (Array.isArray(files)) {
+            files.forEach(function(f) {
+                if (f && f.category && stats[f.category] !== undefined) {
+                    stats[f.category]++;
+                }
+            });
         }
-    }
+    } catch (error) {}
     return stats;
 };
 

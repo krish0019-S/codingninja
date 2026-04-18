@@ -462,6 +462,21 @@ var syncPortfolioFileOrder = async function (category, folder, files) {
     return merged.map(function(name) { return fileMap.get(name); }).filter(Boolean);
 };
 
+var PORTFOLIO_DB_FILE = path.join(__dirname, "..", "data", "portfolio-db.json");
+
+var readPortfolioDB = async function () {
+    try {
+        var raw = await fs.promises.readFile(PORTFOLIO_DB_FILE, "utf8");
+        return JSON.parse(raw) || [];
+    } catch (e) {
+        return [];
+    }
+};
+var writePortfolioDB = async function (data) {
+    await fs.promises.mkdir(path.dirname(PORTFOLIO_DB_FILE), { recursive: true });
+    await fs.promises.writeFile(PORTFOLIO_DB_FILE, JSON.stringify(data, null, 2), "utf8");
+};
+
 var listPortfolioFilesOrdered = async function (category, folderName) {
     var files = await listPortfolioFiles(category, folderName);
     return syncPortfolioFileOrder(category, folderName, files);
@@ -489,18 +504,7 @@ var reorderPortfolioFileSequence = async function (category, folder, fileName, t
 var listPortfolioFolders = async function (category) {
     var normCat = normalizeFolderName(category);
     if (!normCat) return [];
-    var rootDir = path.join(PORTFOLIO_ROOT_DIR, normCat);
-    try {
-        await fs.promises.mkdir(rootDir, { recursive: true });
-        var entries = await fs.promises.readdir(rootDir, { withFileTypes: true });
-        return entries.filter(function (e) {
-            return e.isDirectory() && GALLERY_FOLDER_REGEX.test(e.name);
-        }).map(function (e) {
-            return e.name;
-        }).sort();
-    } catch (error) {
-        return [];
-    }
+    return await readPortfolioFolderOrder(normCat);
 };
 
 var listPortfolioFiles = async function (category, folderName) {
@@ -508,39 +512,12 @@ var listPortfolioFiles = async function (category, folderName) {
     var normFolder = normalizeFolderName(folderName);
     if (!normCat || !normFolder) throw new Error("Invalid folder.");
     
-    var folderDir = getPortfolioFolderDir(normCat, normFolder);
-    if (!folderDir) throw new Error("Invalid folder.");
-    
-    try {
-        var stats = await fs.promises.stat(folderDir);
-        if (!stats.isDirectory()) throw new Error("Folder not found.");
-    } catch (e) {
-        throw new Error("Folder not found.");
-    }
-
-    var entries = await fs.promises.readdir(folderDir, { withFileTypes: true });
-    var files = entries.filter(function (e) {
-        if (!e.isFile()) return false;
-        var ext = path.extname(e.name).toLowerCase();
-        return GALLERY_FILE_REGEX.test(e.name) && (ext === ".jpg" || ext === ".jpeg" || ext === ".png" || ext === ".mp4");
-    }).map(function (e) {
-        return e.name;
+    var dbData = await readPortfolioDB();
+    var files = dbData.filter(function (e) {
+        return e.category === normCat && e.folder === normFolder;
     });
 
-    var details = await Promise.all(files.map(async function (fileName) {
-        var filePath = path.join(folderDir, fileName);
-        var stat = await fs.promises.stat(filePath);
-        return {
-            name: fileName,
-            category: normCat,
-            folder: normFolder,
-            path: "/portfolio/" + normCat + "/" + normFolder + "/" + fileName,
-            size: stat.size,
-            createdAt: stat.birthtime || stat.mtime
-        };
-    }));
-
-    return details.sort(function (a, b) {
+    return files.sort(function (a, b) {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 };
@@ -555,17 +532,21 @@ var renamePortfolioFile = async function (category, folder, oldName, newNameBase
     if (!sanitizedNewBase) throw new Error("Invalid new file name.");
     var finalNewName = sanitizedNewBase + ext;
     if (oldName === finalNewName) return { oldName: oldName, newName: finalNewName };
-    var folderDir = getPortfolioFolderDir(normCat, normFolder);
-    if (!folderDir) throw new Error("Invalid folder.");
-    var oldPath = path.join(folderDir, oldName);
-    var newPath = path.join(folderDir, finalNewName);
-    try {
-        await fs.promises.access(newPath);
-        throw new Error("A file with the new name already exists.");
-    } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
-    }
-    await fs.promises.rename(oldPath, newPath);
+    
+    var dbData = await readPortfolioDB();
+    var fileItem = dbData.find(function(item) {
+        return item.category === normCat && item.folder === normFolder && item.name === oldName;
+    });
+    if (!fileItem) throw new Error("File not found.");
+    
+    var exists = dbData.find(function(item) {
+        return item.category === normCat && item.folder === normFolder && item.name === finalNewName;
+    });
+    if (exists) throw new Error("A file with the new name already exists.");
+    
+    fileItem.name = finalNewName;
+    await writePortfolioDB(dbData);
+
     var order = await readPortfolioFileOrder(category, folder);
     var orderIndex = order.indexOf(oldName);
     if (orderIndex > -1) {
@@ -582,16 +563,6 @@ var PORTFOLIO_MIME_TO_EXT = {
     "image/png": ".png",
     "video/mp4": ".mp4",
 };
-var portfolioUpload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: PORTFOLIO_MAX_SIZE },
-    fileFilter: function (req, file, cb) {
-        if (PORTFOLIO_MIME_TO_EXT[String(file && file.mimetype || "").toLowerCase()]) {
-            return cb(null, true);
-        }
-        return cb(new Error("Only JPG/PNG/MP4 files are allowed."));
-    },
-});
 
 var isValidEmail = function (email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -2445,8 +2416,6 @@ router.post("/portfolio-folders", adminAuth, async function (req, res) {
         if (existing.some(function(n) { return folderKey(n) === key; })) {
             return res.status(409).json({ ok: false, message: "Folder already exists." });
         }
-        var folderDir = getPortfolioFolderDir(category, folderName);
-        await fs.promises.mkdir(folderDir, { recursive: true });
 
         var order = await readPortfolioFolderOrder(category);
         order.unshift(folderName);
@@ -2549,9 +2518,26 @@ router.delete("/portfolio-folders/:folderName", adminAuth, async function (req, 
 
     try {
         await clearPortfolioCoverFileName(category, folderName);
-        var folderDir = getPortfolioFolderDir(category, folderName);
-        if (!folderDir) return res.status(400).json({ ok: false, message: "Invalid folder name." });
-        await fs.promises.rm(folderDir, { recursive: true, force: false });
+        
+        // Delete files from DB and Cloudinary
+        var dbData = await readPortfolioDB();
+        var filesToDelete = dbData.filter(function(item) {
+            return item.category === category && item.folder === folderName;
+        });
+        
+        for (var i = 0; i < filesToDelete.length; i++) {
+            var item = filesToDelete[i];
+            if (item.public_id) {
+                var resourceType = item.name.toLowerCase().endsWith(".mp4") ? "video" : "image";
+                await cloudinary.uploader.destroy(item.public_id, { resource_type: resourceType }).catch(function(){});
+            }
+        }
+        dbData = dbData.filter(function(item) { return !(item.category === category && item.folder === folderName); });
+        await writePortfolioDB(dbData);
+        
+        var order = await readPortfolioFolderOrder(category);
+        order = order.filter(function(name) { return folderKey(name) !== folderKey(folderName); });
+        await writePortfolioFolderOrder(category, order);
         
         var folders = await listPortfolioFoldersOrdered(category);
         var cards = await Promise.all(folders.map(async function(folder) {
@@ -2584,52 +2570,68 @@ router.get("/portfolio-files", adminAuth, async function (req, res) {
     }
 });
 
-router.post("/portfolio-files", adminAuth, function (req, res) {
-    portfolioUpload.array("files")(req, res, async function (err) {
-        if (err) return res.status(400).json({ ok: false, message: err.message });
-        
-        var files = Array.isArray(req.files) ? req.files : [];
-        if (!files.length) return res.status(400).json({ ok: false, message: "No files uploaded." });
-        
-        var category = normalizeFolderName(getRequestValue(req, "category"));
-        var folderName = normalizeFolderName(getRequestValue(req, "folder"));
-        if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
+router.post("/portfolio-files", adminAuth, fileUploader(), async function (req, res) {
+    if (!req.files || !req.files.files) return res.status(400).json({ ok: false, message: "No files uploaded." });
+    
+    var files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
+    var category = normalizeFolderName(getRequestValue(req, "category"));
+    var folderName = normalizeFolderName(getRequestValue(req, "folder"));
+    if (!category || !folderName) return res.status(400).json({ ok: false, message: "Invalid folder name." });
 
-        try {
-            var folderDir = getPortfolioFolderDir(category, folderName);
-            if (!folderDir) return res.status(400).json({ ok: false, message: "Invalid folder name." });
-            
-            var uploaded = [];
-            for (var i = 0; i < files.length; i += 1) {
-                var file = files[i];
+    try {
+        var dbData = await readPortfolioDB();
+        var uploadPromises = files.map(function(file) {
+            return new Promise(function(resolve, reject) {
                 var ext = PORTFOLIO_MIME_TO_EXT[String(file.mimetype || "").toLowerCase()];
-                if (!ext) return res.status(400).json({ ok: false, message: "Invalid file type." });
+                if (!ext) return reject(new Error("Invalid file type. Only JPG/PNG/MP4 allowed."));
+                if (ext !== ".mp4" && file.size > 3 * 1024 * 1024) return reject(new Error("Image files cannot exceed 3MB."));
                 
-                if (ext !== ".mp4" && file.size > 3 * 1024 * 1024) {
-                    return res.status(400).json({ ok: false, message: "Image files cannot exceed 3MB." });
-                }
+                var isVideo = ext === ".mp4";
+                var uploadStream = cloudinary.uploader.upload_stream(
+                    { resource_type: isVideo ? "video" : "image", folder: "rudraksh_portfolio/" + category + "/" + folderName },
+                    function(error, result) {
+                        if (error) {
+                            console.error("Cloudinary error:", error);
+                            return reject(error);
+                        }
+                        
+                        var originalExt = path.extname(String(file.name || "")).toLowerCase();
+                        var baseName = sanitizeImageBaseName(path.basename(String(file.name || ""), originalExt));
+                        var uniquePart = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+                        var fileName = baseName + "-" + uniquePart + ext;
+                        
+                        resolve({
+                            id: Date.now() + Math.floor(Math.random() * 1000),
+                            category: category,
+                            folder: folderName,
+                            name: fileName,
+                            path: result.secure_url,
+                            public_id: result.public_id,
+                            size: file.size,
+                            createdAt: new Date().toISOString()
+                        });
+                    }
+                );
+                uploadStream.end(file.data);
+            });
+        });
+        
+        var results = await Promise.all(uploadPromises);
+        dbData = dbData.concat(results);
+        await writePortfolioDB(dbData);
+        
+        var uploadedNames = results.map(function(r) { return r.name; });
+        var order = await readPortfolioFileOrder(category, folderName);
+        var newOrder = uploadedNames.concat(order);
+        await writePortfolioFileOrder(category, folderName, newOrder);
 
-                var originalExt = path.extname(String(file.originalname || "")).toLowerCase();
-                var baseName = sanitizeImageBaseName(path.basename(String(file.originalname || ""), originalExt));
-                var uniquePart = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
-                var fileName = baseName + "-" + uniquePart + ext;
-                var savePath = path.join(folderDir, fileName);
-                
-                await fs.promises.writeFile(savePath, file.buffer);
-                uploaded.push(fileName);
-            }
-            
-            var order = await readPortfolioFileOrder(category, folderName);
-            var newOrder = uploaded.concat(order);
-            await writePortfolioFileOrder(category, folderName, newOrder);
-
-            var fileList = await listPortfolioFilesOrdered(category, folderName);
-            var coverFile = await resolvePortfolioCoverFile(category, folderName, fileList);
-            return res.json({ ok: true, message: "Files uploaded successfully.", files: fileList, coverFileName: coverFile ? coverFile.name : "" });
-        } catch (error) {
-            return res.status(500).json({ ok: false, message: "Unable to upload files." });
-        }
-    });
+        var fileList = await listPortfolioFilesOrdered(category, folderName);
+        var coverFile = await resolvePortfolioCoverFile(category, folderName, fileList);
+        return res.json({ ok: true, message: "Files uploaded successfully.", files: fileList, coverFileName: coverFile ? coverFile.name : "" });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ ok: false, message: error.message || "Unable to upload files." });
+    }
 });
 
 router.delete("/portfolio-files/:fileName", adminAuth, async function (req, res) {
@@ -2642,11 +2644,20 @@ router.delete("/portfolio-files/:fileName", adminAuth, async function (req, res)
     }
     
     try {
-        var folderDir = getPortfolioFolderDir(category, folderName);
-        var targetPath = path.resolve(folderDir, fileName);
-        if (!targetPath.startsWith(folderDir + path.sep)) return res.status(400).json({ ok: false, message: "Invalid file name." });
+        var dbData = await readPortfolioDB();
+        var fileIndex = dbData.findIndex(function(item) {
+            return item.category === category && item.folder === folderName && item.name === fileName;
+        });
         
-        await fs.promises.unlink(targetPath);
+        if (fileIndex > -1) {
+            var item = dbData[fileIndex];
+            if (item.public_id) {
+                var resourceType = item.name.toLowerCase().endsWith(".mp4") ? "video" : "image";
+                await cloudinary.uploader.destroy(item.public_id, { resource_type: resourceType }).catch(function(){});
+            }
+            dbData.splice(fileIndex, 1);
+            await writePortfolioDB(dbData);
+        }
 
         var order = await readPortfolioFileOrder(category, folderName);
         var newOrder = order.filter(function(name) { return name !== fileName; });
