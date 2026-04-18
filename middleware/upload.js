@@ -1,6 +1,6 @@
 var multer = require("multer");
 
-var MAX_SIZE = 5 * 1024 * 1024;
+var MAX_SIZE = 3 * 1024 * 1024;
 var allowedMimes = ["image/jpeg", "image/jpg", "image/png"];
 
 var storage = multer.memoryStorage();

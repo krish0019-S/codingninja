@@ -7,8 +7,19 @@ var db = require("./config/db");
 var carouselBanners = require("./utils/carouselBanners");
 var enquiries = require("./utils/enquiries");
 var newsItems = require("./utils/newsItems");
+var fileUploader = require("express-fileupload");
 
 
+var app= express();
+var cloudinary = require("cloudinary").v2;
+app.use(express.urlencoded(true));
+app.use(fileUploader());
+
+cloudinary.config({
+   cloud_name: 'ddheg3kkk',
+   api_key: '129812533926621',
+   api_secret: 'y0eWfsGGR8u6wjfjYHr7DOpSYns'
+});
 
 var app = express();
 var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -171,6 +182,13 @@ var countPortfolioStats = async function () {
 app.use(express.static("Public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Note: Using app.use(fileUploader()) globally here will break your existing Multer routes
+// (like portfolio and gallery uploads). Instead, we apply the fileUploader specifically 
+// to the Cloudinary upload route inside adminRoutes.js.
+// var fileUploader = require("express-fileupload");
+// app.use(fileUploader());
+
 app.use("/admin", adminRoutes);
 
 app.get("/analytics", async function (req, res) {

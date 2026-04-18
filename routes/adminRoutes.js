@@ -6,6 +6,8 @@ var nodemailer = require("nodemailer");
 var multer = require("multer");
 var { upload } = require("../middleware/upload");
 var adminAuth = require("../middleware/adminAuth");
+var fileUploader = require("express-fileupload");
+var cloudinary = require("cloudinary").v2;
 var db = require("../config/db");
 var carouselBanners = require("../utils/carouselBanners");
 var enquiries = require("../utils/enquiries");
@@ -29,7 +31,7 @@ var MIME_TO_EXT = {
     "image/png": ".png",
 };
 var NEWS_MEDIA_DIR = path.join(__dirname, "..", "Public", "news-files");
-var NEWS_MEDIA_MAX_SIZE = 8 * 1024 * 1024;
+var NEWS_MEDIA_MAX_SIZE = 3 * 1024 * 1024;
 var NEWS_MEDIA_MIME_TO_EXT = {
     "image/jpeg": ".jpg",
     "image/jpg": ".jpg",
@@ -54,7 +56,7 @@ var VIDEO_MIME_TO_EXT = {
     "video/quicktime": ".mov",
     "video/x-m4v": ".m4v",
 };
-var MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+var MAX_VIDEO_SIZE = 8 * 1024 * 1024;
 var videoUpload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: MAX_VIDEO_SIZE },
@@ -174,6 +176,90 @@ var syncPortfolioFolderOrder = async function (category, folders) {
 
     return merged;
 };
+
+var MEDIA_STORE_FILE = path.join(__dirname, "..", "data", "media-store.json");
+
+var readMediaStore = async function () {
+    try {
+        var raw = await fs.promises.readFile(MEDIA_STORE_FILE, "utf8");
+        return JSON.parse(raw) || [];
+    } catch (e) {
+        return [];
+    }
+};
+
+var writeMediaStore = async function (data) {
+    await fs.promises.mkdir(path.dirname(MEDIA_STORE_FILE), { recursive: true });
+    await fs.promises.writeFile(MEDIA_STORE_FILE, JSON.stringify(data, null, 2));
+};
+
+router.get("/media", adminAuth, async function (req, res) {
+    try {
+        var media = await readMediaStore();
+        return res.json({ ok: true, media: media });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to load media." });
+    }
+});
+
+router.post("/save-media", adminAuth, async function (req, res) {
+    var url = getRequestValue(req, "url");
+    var type = getRequestValue(req, "type") || "image"; // 'image' or 'video'
+    if (!url) return res.status(400).json({ ok: false, message: "URL is required." });
+
+    try {
+        var media = await readMediaStore();
+        var newItem = { id: Date.now(), url: url, type: type, createdAt: new Date().toISOString() };
+        media.unshift(newItem);
+        await writeMediaStore(media);
+        return res.json({ ok: true, message: "Media saved successfully.", item: newItem });
+    } catch (error) {
+        return res.status(500).json({ ok: false, message: "Unable to save media." });
+    }
+});
+
+router.delete("/media/:id", adminAuth, async function(req, res) {
+    var id = Number(req.params.id);
+    try {
+        var media = await readMediaStore();
+        var filtered = media.filter(function(m) { return m.id !== id; });
+        if (media.length === filtered.length) return res.status(404).json({ ok: false, message: "Media not found."});
+        await writeMediaStore(filtered);
+        return res.json({ ok: true, message: "Media deleted successfully." });
+    } catch(e) {
+        return res.status(500).json({ ok: false, message: "Unable to delete media." });
+    }
+});
+
+router.post("/cloudinary-upload", adminAuth, fileUploader(), function (req, res) {
+    if (!req.files || !req.files.file) {
+        return res.status(400).json({ ok: false, message: "No file uploaded." });
+    }
+
+    var file = req.files.file;
+    var isImage = String(file.mimetype || "").startsWith("image/");
+
+    var uploadStream = cloudinary.uploader.upload_stream(
+        { resource_type: "auto", folder: "rudraksh_media" },
+        async function (error, result) {
+            if (error) {
+                console.error("Cloudinary error:", error);
+                return res.status(500).json({ ok: false, message: "Upload to Cloudinary failed." });
+            }
+            try {
+                var media = await readMediaStore();
+                var newItem = { id: Date.now(), url: result.secure_url, type: isImage ? "image" : "video", createdAt: new Date().toISOString() };
+                media.unshift(newItem);
+                await writeMediaStore(media);
+                return res.json({ ok: true, message: "Media saved successfully.", item: newItem });
+            } catch (dbError) {
+                return res.status(500).json({ ok: false, message: "Failed to save media record." });
+            }
+        }
+    );
+
+    uploadStream.end(file.data);
+});
 
 var listPortfolioFoldersOrdered = async function (category) {
     var folders = await listPortfolioFolders(category);
@@ -489,7 +575,7 @@ var renamePortfolioFile = async function (category, folder, oldName, newNameBase
     return { oldName: oldName, newName: finalNewName };
 };
 
-var PORTFOLIO_MAX_SIZE = 10 * 1024 * 1024; // 10MB
+var PORTFOLIO_MAX_SIZE = 8 * 1024 * 1024; // 8MB
 var PORTFOLIO_MIME_TO_EXT = {
     "image/jpeg": ".jpg",
     "image/jpg": ".jpg",
@@ -2519,6 +2605,10 @@ router.post("/portfolio-files", adminAuth, function (req, res) {
                 var ext = PORTFOLIO_MIME_TO_EXT[String(file.mimetype || "").toLowerCase()];
                 if (!ext) return res.status(400).json({ ok: false, message: "Invalid file type." });
                 
+                if (ext !== ".mp4" && file.size > 3 * 1024 * 1024) {
+                    return res.status(400).json({ ok: false, message: "Image files cannot exceed 3MB." });
+                }
+
                 var originalExt = path.extname(String(file.originalname || "")).toLowerCase();
                 var baseName = sanitizeImageBaseName(path.basename(String(file.originalname || ""), originalExt));
                 var uniquePart = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);

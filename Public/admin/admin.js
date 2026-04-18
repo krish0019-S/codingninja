@@ -526,7 +526,7 @@ $(function () {
                             '<button class="btn btn-primary btn-update" type="button">Update</button>' +
                             '<button class="btn btn-outline-danger btn-remove" type="button">Remove</button>' +
                         "</div>" +
-                        '<small class="text-muted">Only JPG/PNG. Max 5MB.<br>Any image size allowed (auto-fit in slider)</small>' +
+                        '<small class="text-muted">Only JPG/PNG. Max 3MB.<br>Any image size allowed (auto-fit in slider)</small>' +
                     "</div>" +
                 "</div>" +
             "</div>"
@@ -3942,4 +3942,162 @@ $(function () {
         showAlert("Logged out successfully.", "success");
         redirectToLogin();
     });
+
+    // =========================================================================
+    // CLOUDINARY UPLOAD & MEDIA MANAGEMENT LOGIC (BACKEND DRIVEN)
+    // =========================================================================
+    
+    // 1. File Validation
+    var validateMediaFile = function(file) {
+        var isImage = file.type.startsWith("image/");
+        var isVideo = file.type.startsWith("video/");
+        
+        if (!isImage && !isVideo) {
+            return { valid: false, error: "Unsupported file type. Only images and videos are allowed." };
+        }
+        
+        var maxSize = isImage ? 3 * 1024 * 1024 : 7 * 1024 * 1024; // 3MB for images, 7MB for videos
+        if (file.size > maxSize) {
+            return { valid: false, error: "File too large. Max allowed is " + (isImage ? "3MB" : "7MB") + "." };
+        }
+        
+        return { valid: true, isImage: isImage, isVideo: isVideo };
+    };
+
+    // 2. Image Compression (HTML Canvas)
+    var compressImage = function(file) {
+        return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function(event) {
+                var img = new Image();
+                img.src = event.target.result;
+                img.onload = function() {
+                    var canvas = document.createElement("canvas");
+                    var MAX_WIDTH = 800; // Resize boundaries
+                    var scaleSize = MAX_WIDTH / img.width;
+                    
+                    if (scaleSize < 1) {
+                        canvas.width = MAX_WIDTH;
+                        canvas.height = img.height * scaleSize;
+                    } else {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                    }
+                    
+                    var ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    canvas.toBlob(function(blob) {
+                        if (!blob) return reject(new Error("Canvas is empty"));
+                        var compressedFile = new File([blob], file.name, {
+                            type: "image/jpeg",
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    }, "image/jpeg", 0.7); // 0.7 JPEG Quality
+                };
+                img.onerror = function() {
+                    reject(new Error("Failed to load image for compression"));
+                };
+            };
+            reader.onerror = function(error) {
+                reject(error);
+            };
+        });
+    };
+
+    // 3. Upload to Backend (uses express-fileupload & Cloudinary SDK)
+    var uploadToBackendCloudinary = function(file) {
+        var formData = new FormData();
+        formData.append("file", file);
+        
+        return new Promise(function(resolve, reject) {
+            $.ajax({
+                url: "/admin/cloudinary-upload",
+                method: "POST",
+                headers: getAuthHeaders(),
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(res) { resolve(res); },
+                error: function(err) { reject(err); }
+            });
+        });
+    };
+
+    // 4. Complete Flow (Hook this to your <input type="file" onchange="...">)
+    window.handleDirectCloudinaryUpload = async function(fileInput) {
+        var file = fileInput.files[0];
+        if (!file) return;
+        
+        var validation = validateMediaFile(file);
+        if (!validation.valid) {
+            showAlert(validation.error, "danger");
+            fileInput.value = "";
+            return;
+        }
+        
+        try {
+            var fileToUpload = file;
+            if (validation.isImage) {
+                // Compress image locally before hitting the network
+                fileToUpload = await compressImage(file);
+            }
+            
+            // Upload via Backend
+            var response = await uploadToBackendCloudinary(fileToUpload);
+            showAlert(response.message || "Media successfully uploaded to Cloudinary!", "success");
+            
+            fileInput.value = "";
+            window.loadCloudinaryMedia(); // Refresh Grid
+        } catch (error) {
+            showAlert("Upload error: " + error.message, "danger");
+            console.error(error);
+        }
+    };
+
+    // 6. Fetch and Render Logic
+    window.loadCloudinaryMedia = function() {
+        $.ajax({
+            url: "/media",
+            method: "GET",
+            headers: getAuthHeaders(),
+            success: function(response) {
+                var mediaList = response.media || [];
+                var container = $("#mediaGridContainer"); // Assuming this container is implemented in HTML
+                if (!container.length) return;
+                
+                if (mediaList.length === 0) {
+                    container.html('<div class="banner-empty-state">No media found.</div>');
+                    return;
+                }
+                
+                var html = mediaList.map(function(item) {
+                    var deleteBtn = '<button class="btn btn-outline-danger btn-sm mt-2" onclick="deleteCloudinaryMedia(' + item.id + ')">Delete</button>';
+                    if (item.type === "video") {
+                        return '<div class="col-auto" style="width: 280px; max-width: 100%;"><article class="gallery-image-card"><div class="gallery-image-preview gallery-video-preview"><video src="' + escapeHtml(item.url) + '" controls preload="metadata" playsinline></video></div><div class="p-2 text-center">' + deleteBtn + '</div></article></div>';
+                    } else {
+                        return '<div class="col-auto" style="width: 280px; max-width: 100%;"><article class="gallery-image-card"><div class="gallery-image-preview"><img src="' + escapeHtml(item.url) + '" alt="Media"></div><div class="p-2 text-center">' + deleteBtn + '</div></article></div>';
+                    }
+                }).join("");
+                
+                container.html(html);
+            }
+        });
+    };
+
+    // 7. Delete API hook
+    window.deleteCloudinaryMedia = function(id) {
+        if (!window.confirm("Delete this media?")) return;
+        $.ajax({
+            url: "/admin/media/" + id,
+            method: "DELETE",
+            headers: getAuthHeaders(),
+            success: function() {
+                showAlert("Media deleted successfully.", "success");
+                window.loadCloudinaryMedia();
+            }
+        });
+    };
 });
