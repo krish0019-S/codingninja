@@ -73,6 +73,9 @@
                 <a class="nav-link" href="#" data-admin-view="videos">
                     <span>Video Gallery</span>
                 </a>
+                <a class="nav-link" href="#" data-admin-view="cloudmedia">
+                    <span>Cloud Media</span>
+                </a>
                 <a class="nav-link" href="#" id="sidebarPasswordLink">
                     <span>Password</span>
                 </a>
@@ -269,7 +272,7 @@
                         </select>
                         <span class="badge bg-soft" id="activePortfolioFolderBadge">Folder: -</span>
                         <button class="btn btn-outline-secondary btn-sm d-none" type="button" id="showAllPortfolioFoldersBtn">Show All Folders</button>
-                        <input class="d-none" id="addPortfolioFilesInput" type="file" accept="image/jpeg,image/png,video/mp4" multiple>
+                        <input class="d-none" id="addPortfolioFilesInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple>
                         <button class="btn btn-primary btn-sm d-none" type="button" id="addPortfolioFilesBtn">Upload Files</button>
                     </div>
                 </div>
@@ -412,6 +415,33 @@
                 <div class="row g-4 d-none" id="videoFileGrid">
                     <div class="col-12">
                         <div class="banner-empty-state">Loading video folder...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="cloudmediaSection" class="admin-section d-none">
+                <header class="content-header">
+                    <div>
+                        <h1>Cloud Media Manager</h1>
+                        <p>Upload images &amp; videos directly to Cloudinary. Files are saved in MongoDB.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-outline-danger btn-sm logout-btn" type="button">Logout</button>
+                    </div>
+                </header>
+
+                <div class="manager-toolbar">
+                    <h2 class="manager-title">Cloudinary Files</h2>
+                    <div class="manager-actions">
+                        <input class="d-none" id="cloudMediaFileInput" type="file" accept="image/jpeg,image/png,video/mp4,video/webm" onchange="handleDirectCloudinaryUpload(this)">
+                        <button class="btn btn-primary btn-sm" type="button" id="cloudMediaUploadBtn">Upload File</button>
+                        <button class="btn btn-outline-secondary btn-sm" type="button" id="cloudMediaRefreshBtn">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="row g-4" id="mediaGridContainer">
+                    <div class="col-12">
+                        <div class="banner-empty-state">Loading cloud media...</div>
                     </div>
                 </div>
             </section>

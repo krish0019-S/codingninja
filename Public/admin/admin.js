@@ -38,6 +38,10 @@ $(function () {
     var newsSection = $("#newsSection");
     var imagesSection = $("#imagesSection");
     var videosSection = $("#videosSection");
+    var cloudmediaSection = $("#cloudmediaSection");
+    var cloudMediaFileInput = $("#cloudMediaFileInput");
+    var cloudMediaUploadBtn = $("#cloudMediaUploadBtn");
+    var cloudMediaRefreshBtn = $("#cloudMediaRefreshBtn");
     var dashboardTotalProjects = $("#dashboardTotalProjects");
     var dashboardEndedProjects = $("#dashboardEndedProjects");
     var dashboardPhotoFolders = $("#dashboardPhotoFolders");
@@ -2299,6 +2303,7 @@ $(function () {
         newsSection.toggleClass("d-none", normalized !== "news");
         imagesSection.toggleClass("d-none", normalized !== "images");
         videosSection.toggleClass("d-none", normalized !== "videos");
+        cloudmediaSection.toggleClass("d-none", normalized !== "cloudmedia");
 
         if (normalized === "dashboard") {
             hideAlert();
@@ -2325,6 +2330,9 @@ $(function () {
         } else if (normalized === "videos") {
             stopAnalyticsAutoRefresh();
             loadVideoFolderCards(currentVideoFolder);
+        } else if (normalized === "cloudmedia") {
+            stopAnalyticsAutoRefresh();
+            window.loadCloudinaryMedia();
         } else {
             stopAnalyticsAutoRefresh();
             loadBanners();
@@ -2335,7 +2343,7 @@ $(function () {
         try {
             var url = new URL(window.location.href);
             var view = String(url.searchParams.get("view") || "");
-            if (view === "dashboard" || view === "banners" || view === "enquiries" || view === "portfolio" || view === "news" || view === "images" || view === "videos") {
+            if (view === "dashboard" || view === "banners" || view === "enquiries" || view === "portfolio" || view === "news" || view === "images" || view === "videos" || view === "cloudmedia") {
                 return view;
             }
         } catch (error) {
@@ -3202,6 +3210,15 @@ $(function () {
         loadNewsItems();
     });
 
+    cloudMediaUploadBtn.on("click", function() {
+        cloudMediaFileInput.trigger("click");
+    });
+
+    cloudMediaRefreshBtn.on("click", function() {
+        if (!ensureAuth()) return;
+        window.loadCloudinaryMedia();
+    });
+
     toggleNewsPauseBtn.on("click", function () {
         if (!ensureAuth()) {
             return;
@@ -4021,7 +4038,17 @@ $(function () {
                 processData: false,
                 contentType: false,
                 success: function(res) { resolve(res); },
-                error: function(err) { reject(err); }
+                error: function(err) {
+                    var message = "Upload failed.";
+                    if (err && err.responseJSON && err.responseJSON.message) {
+                        message = String(err.responseJSON.message);
+                    } else if (err && err.status === 401) {
+                        message = "Session expired. Please login again.";
+                    } else if (err && err.statusText) {
+                        message = String(err.statusText);
+                    }
+                    reject(new Error(message));
+                }
             });
         });
     };
@@ -4047,12 +4074,18 @@ $(function () {
             
             // Upload via Backend
             var response = await uploadToBackendCloudinary(fileToUpload);
+            if (response && response.item && response.item.url) {
+                console.log("[Cloudinary Upload] File URL:", response.item.url);
+                if (response.item.folderUrl) {
+                    console.log("[Cloudinary Upload] Folder URL:", response.item.folderUrl);
+                }
+            }
             showAlert(response.message || "Media successfully uploaded to Cloudinary!", "success");
             
             fileInput.value = "";
             window.loadCloudinaryMedia(); // Refresh Grid
         } catch (error) {
-            showAlert("Upload error: " + error.message, "danger");
+            showAlert("Upload error: " + String(error && error.message ? error.message : "Unknown error"), "danger");
             console.error(error);
         }
     };
@@ -4060,7 +4093,7 @@ $(function () {
     // 6. Fetch and Render Logic
     window.loadCloudinaryMedia = function() {
         $.ajax({
-            url: "/media",
+            url: "/admin/media",
             method: "GET",
             headers: getAuthHeaders(),
             success: function(response) {
@@ -4074,7 +4107,8 @@ $(function () {
                 }
                 
                 var html = mediaList.map(function(item) {
-                    var deleteBtn = '<button class="btn btn-outline-danger btn-sm mt-2" onclick="deleteCloudinaryMedia(' + item.id + ')">Delete</button>';
+                    var deleteIdArg = JSON.stringify(String(item.id || ""));
+                    var deleteBtn = '<button class="btn btn-outline-danger btn-sm mt-2" onclick="deleteCloudinaryMedia(' + deleteIdArg.replace(/"/g, "&quot;") + ')">Delete</button>';
                     if (item.type === "video") {
                         return '<div class="col-auto" style="width: 280px; max-width: 100%;"><article class="gallery-image-card"><div class="gallery-image-preview gallery-video-preview"><video src="' + escapeHtml(item.url) + '" controls preload="metadata" playsinline></video></div><div class="p-2 text-center">' + deleteBtn + '</div></article></div>';
                     } else {

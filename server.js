@@ -4,24 +4,14 @@ var path = require("path");
 var fs = require("fs");
 var adminRoutes = require("./routes/adminRoutes");
 var db = require("./config/db");
+var { connectMongo } = require("./config/mongo");
+var { cloudinary } = require("./config/cloudinary");
 var carouselBanners = require("./utils/carouselBanners");
 var enquiries = require("./utils/enquiries");
 var newsItems = require("./utils/newsItems");
-var fileUploader = require("express-fileupload");
-
-
-var app= express();
-var cloudinary = require("cloudinary").v2;
-app.use(express.urlencoded(true));
-app.use(fileUploader());
-
-cloudinary.config({
-   cloud_name: 'ddheg3kkk',
-   api_key: '129812533926621',
-   api_secret: 'y0eWfsGGR8u6wjfjYHr7DOpSYns'
-});
 
 var app = express();
+
 var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var GALLERY_FOLDER_REGEX = /^[a-z0-9][a-z0-9_-]{0,39}$/i;
 var IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png"]);
@@ -432,6 +422,10 @@ app.post("/enquiry", async function (req, res) {
 
 app.listen(1502, () => {
     console.log("Server running on port 1502");
+});
+
+connectMongo().catch(function () {
+    // Connection error is already logged in config/mongo.js
 });
 
 db.query("SELECT 1")

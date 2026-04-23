@@ -7,8 +7,9 @@ var multer = require("multer");
 var { upload } = require("../middleware/upload");
 var adminAuth = require("../middleware/adminAuth");
 var fileUploader = require("express-fileupload");
-var cloudinary = require("cloudinary").v2;
+var { cloudinary, isCloudinaryConfigured } = require("../config/cloudinary");
 var db = require("../config/db");
+var MediaItem = require("../models/MediaItem");
 var carouselBanners = require("../utils/carouselBanners");
 var enquiries = require("../utils/enquiries");
 var newsItems = require("../utils/newsItems");
@@ -177,26 +178,70 @@ var syncPortfolioFolderOrder = async function (category, folders) {
     return merged;
 };
 
-var MEDIA_STORE_FILE = path.join(__dirname, "..", "data", "media-store.json");
-
-var readMediaStore = async function () {
-    try {
-        var raw = await fs.promises.readFile(MEDIA_STORE_FILE, "utf8");
-        return JSON.parse(raw) || [];
-    } catch (e) {
-        return [];
+var serializeMediaItem = function (item) {
+    if (!item) {
+        return null;
     }
+
+    return {
+        id: String(item._id || ""),
+        url: String(item.url || ""),
+        folder: String(item.folder || "rudraksh_media"),
+        folderUrl: String(item.folderUrl || ""),
+        type: String(item.type || "image"),
+        createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : new Date().toISOString(),
+    };
 };
 
-var writeMediaStore = async function (data) {
-    await fs.promises.mkdir(path.dirname(MEDIA_STORE_FILE), { recursive: true });
-    await fs.promises.writeFile(MEDIA_STORE_FILE, JSON.stringify(data, null, 2));
+var normalizeResourceType = function (value) {
+    var text = String(value || "").trim().toLowerCase();
+    if (text === "image" || text === "video" || text === "raw") {
+        return text;
+    }
+    return "auto";
+};
+
+var normalizeCloudinaryFolder = function (value) {
+    var text = String(value || "").trim();
+    if (!text) {
+        return "rudraksh_media";
+    }
+
+    var cleaned = text
+        .replace(/\\/g, "/")
+        .replace(/^\//, "")
+        .replace(/\/$/, "")
+        .replace(/\/{2,}/g, "/");
+
+    if (!/^[a-zA-Z0-9/_-]{1,120}$/.test(cleaned)) {
+        return "rudraksh_media";
+    }
+
+    return cleaned;
+};
+
+var buildCloudinaryFolderUrl = function (secureUrl) {
+    var url = String(secureUrl || "").trim();
+    if (!url) {
+        return "";
+    }
+
+    var parts = url.split("/");
+    if (parts.length <= 1) {
+        return "";
+    }
+
+    parts.pop();
+    return parts.join("/");
 };
 
 router.get("/media", adminAuth, async function (req, res) {
     try {
-        var media = await readMediaStore();
-        return res.json({ ok: true, media: media });
+        var media = await MediaItem.find({}).sort({ createdAt: -1 }).lean();
+        return res.json({
+            ok: true,
+            media: media.map(serializeMediaItem).filter(Boolean),
+        });
     } catch (error) {
         return res.status(500).json({ ok: false, message: "Unable to load media." });
     }
@@ -208,57 +253,106 @@ router.post("/save-media", adminAuth, async function (req, res) {
     if (!url) return res.status(400).json({ ok: false, message: "URL is required." });
 
     try {
-        var media = await readMediaStore();
-        var newItem = { id: Date.now(), url: url, type: type, createdAt: new Date().toISOString() };
-        media.unshift(newItem);
-        await writeMediaStore(media);
-        return res.json({ ok: true, message: "Media saved successfully.", item: newItem });
+        var normalizedType = String(type).toLowerCase() === "video" ? "video" : "image";
+        var folder = normalizeCloudinaryFolder(getRequestValue(req, "folder"));
+        var folderUrl = String(getRequestValue(req, "folderUrl") || "").trim() || buildCloudinaryFolderUrl(url);
+        var item = await MediaItem.create({
+            url: String(url).trim(),
+            folder: folder,
+            folderUrl: folderUrl,
+            type: normalizedType,
+            publicId: String(getRequestValue(req, "publicId") || "").trim(),
+            resourceType: normalizeResourceType(getRequestValue(req, "resourceType")),
+        });
+        return res.json({ ok: true, message: "Media saved successfully.", item: serializeMediaItem(item) });
     } catch (error) {
         return res.status(500).json({ ok: false, message: "Unable to save media." });
     }
 });
 
 router.delete("/media/:id", adminAuth, async function(req, res) {
-    var id = Number(req.params.id);
+    var id = String(req.params.id || "").trim();
+    if (!id) {
+        return res.status(400).json({ ok: false, message: "Invalid media id." });
+    }
+
     try {
-        var media = await readMediaStore();
-        var filtered = media.filter(function(m) { return m.id !== id; });
-        if (media.length === filtered.length) return res.status(404).json({ ok: false, message: "Media not found."});
-        await writeMediaStore(filtered);
+        var item = await MediaItem.findById(id);
+        if (!item) {
+            return res.status(404).json({ ok: false, message: "Media not found." });
+        }
+
+        if (item.publicId) {
+            await cloudinary.uploader.destroy(String(item.publicId), {
+                resource_type: String(item.resourceType || "auto"),
+            }).catch(function () { });
+        }
+
+        await MediaItem.deleteOne({ _id: item._id });
         return res.json({ ok: true, message: "Media deleted successfully." });
     } catch(e) {
+        if (e && e.name === "CastError") {
+            return res.status(400).json({ ok: false, message: "Invalid media id." });
+        }
         return res.status(500).json({ ok: false, message: "Unable to delete media." });
     }
 });
 
-router.post("/cloudinary-upload", adminAuth, fileUploader(), function (req, res) {
+router.post("/cloudinary-upload", adminAuth, fileUploader({ useTempFiles: true, tempFileDir: "/tmp/" }), async function (req, res) {
+    if (!isCloudinaryConfigured) {
+        return res.status(500).json({ ok: false, message: "Cloudinary is not configured on server." });
+    }
+
     if (!req.files || !req.files.file) {
         return res.status(400).json({ ok: false, message: "No file uploaded." });
     }
 
     var file = req.files.file;
     var isImage = String(file.mimetype || "").startsWith("image/");
+    var folder = normalizeCloudinaryFolder(getRequestValue(req, "folder"));
 
-    var uploadStream = cloudinary.uploader.upload_stream(
-        { resource_type: "auto", folder: "rudraksh_media" },
-        async function (error, result) {
-            if (error) {
-                console.error("Cloudinary error:", error);
-                return res.status(500).json({ ok: false, message: "Upload to Cloudinary failed." });
-            }
-            try {
-                var media = await readMediaStore();
-                var newItem = { id: Date.now(), url: result.secure_url, type: isImage ? "image" : "video", createdAt: new Date().toISOString() };
-                media.unshift(newItem);
-                await writeMediaStore(media);
-                return res.json({ ok: true, message: "Media saved successfully.", item: newItem });
-            } catch (dbError) {
-                return res.status(500).json({ ok: false, message: "Failed to save media record." });
-            }
-        }
-    );
+    try {
+        console.log("[Cloudinary] Starting upload for:", file.name, "to folder:", folder);
+        
+        // Upload to Cloudinary using the file path provided by useTempFiles
+        const result = await cloudinary.uploader.upload(file.tempFilePath, {
+            resource_type: "auto",
+            folder: folder
+        });
 
-    uploadStream.end(file.data);
+        var secureUrl = String(result.secure_url || "").trim();
+        var folderUrl = buildCloudinaryFolderUrl(secureUrl);
+
+        console.log("[Cloudinary] Upload success:", secureUrl);
+
+        // Save metadata to MongoDB
+        var item = await MediaItem.create({
+            url: secureUrl,
+            folder: folder,
+            folderUrl: folderUrl,
+            type: isImage ? "image" : "video",
+            publicId: String(result.public_id || "").trim(),
+            resourceType: normalizeResourceType(result.resource_type),
+        });
+
+        console.log("[MongoDB] Record saved with ID:", item._id);
+
+        return res.json({ 
+            ok: true, 
+            message: "Media saved successfully to Cloud and Database.", 
+            item: serializeMediaItem(item) 
+        });
+
+    } catch (error) {
+        console.error("[Upload Error]", error);
+        var msg = error.message || "Upload failed.";
+        if (error.http_code) msg = "Cloudinary Error (" + error.http_code + "): " + msg;
+        
+        return res.status(500).json({ 
+            ok: false, 
+            message: msg 
+        });
+    }
 });
 
 var listPortfolioFoldersOrdered = async function (category) {
@@ -556,12 +650,20 @@ var renamePortfolioFile = async function (category, folder, oldName, newNameBase
     return { oldName: oldName, newName: finalNewName };
 };
 
-var PORTFOLIO_MAX_SIZE = 8 * 1024 * 1024; // 8MB
+var PORTFOLIO_MAX_SIZE = 50 * 1024 * 1024; // 50MB total for safety
+var PORTFOLIO_IMAGE_MAX_SIZE = 10 * 1024 * 1024; // 10MB per image
 var PORTFOLIO_MIME_TO_EXT = {
     "image/jpeg": ".jpg",
     "image/jpg": ".jpg",
     "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/svg+xml": ".svg",
     "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/ogg": ".ogg",
+    "video/quicktime": ".mov",
+    "video/x-m4v": ".m4v",
 };
 
 var isValidEmail = function (email) {
@@ -2571,6 +2673,13 @@ router.get("/portfolio-files", adminAuth, async function (req, res) {
 });
 
 router.post("/portfolio-files", adminAuth, fileUploader(), async function (req, res) {
+    if (!isCloudinaryConfigured) {
+        return res.status(500).json({
+            ok: false,
+            message: "Cloudinary is not configured on server.",
+        });
+    }
+
     if (!req.files || !req.files.files) return res.status(400).json({ ok: false, message: "No files uploaded." });
     
     var files = Array.isArray(req.files.files) ? req.files.files : [req.files.files];
@@ -2582,13 +2691,25 @@ router.post("/portfolio-files", adminAuth, fileUploader(), async function (req, 
         var dbData = await readPortfolioDB();
         var uploadPromises = files.map(function(file) {
             return new Promise(function(resolve, reject) {
-                var ext = PORTFOLIO_MIME_TO_EXT[String(file.mimetype || "").toLowerCase()];
-                if (!ext) return reject(new Error("Invalid file type. Only JPG/PNG/MP4 allowed."));
-                if (ext !== ".mp4" && file.size > 3 * 1024 * 1024) return reject(new Error("Image files cannot exceed 3MB."));
+                var mimeType = String(file.mimetype || "").toLowerCase();
+                var ext = PORTFOLIO_MIME_TO_EXT[mimeType];
+                if (!ext) {
+                    // Try to fallback to original extension
+                    var fallbackExt = path.extname(String(file.name || "")).toLowerCase();
+                    if ([".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".mov", ".webm", ".m4v"].includes(fallbackExt)) {
+                        ext = fallbackExt;
+                    } else {
+                        return reject(new Error("Unsupported file type: " + mimeType));
+                    }
+                }
+
+                var isVideo = mimeType.startsWith("video/") || ext === ".mp4" || ext === ".mov";
+                if (!isVideo && file.size > PORTFOLIO_IMAGE_MAX_SIZE) {
+                    return reject(new Error("Image files cannot exceed 10MB."));
+                }
                 
-                var isVideo = ext === ".mp4";
                 var uploadStream = cloudinary.uploader.upload_stream(
-                    { resource_type: isVideo ? "video" : "image", folder: "rudraksh_portfolio/" + category + "/" + folderName },
+                    { resource_type: "auto", folder: "rudraksh_portfolio/" + category + "/" + folderName },
                     function(error, result) {
                         if (error) {
                             console.error("Cloudinary error:", error);
