@@ -1,13 +1,7 @@
 var path = require("path");
-var fs = require("fs");
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+require("dotenv").config();
 
-// Load .env from root directory explicitly
-var envPath = path.join(__dirname, "..", ".env");
-if (fs.existsSync(envPath)) {
-    require("dotenv").config({ path: envPath });
-} else {
-    require("dotenv").config();
-}
 
 var cloudinary = require("cloudinary").v2;
 
