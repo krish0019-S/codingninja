@@ -1,4 +1,4 @@
-var db = require("../config/db");
+var EnquiryItem = require("../models/EnquiryItem");
 
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var PHONE_REGEX = /^(?:\+\d{1,3}\s)?\d{10}$/;
@@ -7,8 +7,6 @@ var DEFAULT_LIMIT = 200;
 var MAX_LIMIT = 1000;
 var MAX_ADDRESS_LENGTH = 150;
 var MAX_MESSAGE_LENGTH = 100;
-
-var tableReadyPromise = null;
 
 var normalizeText = function (value) {
     return String(value == null ? "" : value).trim();
@@ -32,28 +30,9 @@ var buildBadRequestError = function (message) {
     return error;
 };
 
-var ensureEnquiriesTable = function () {
-    if (!tableReadyPromise) {
-        tableReadyPromise = db.query(
-            "CREATE TABLE IF NOT EXISTS enquiries (" +
-                "id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT," +
-                "full_name VARCHAR(120) NOT NULL," +
-                "email VARCHAR(190) NOT NULL," +
-                "phone VARCHAR(32) NOT NULL," +
-                "address VARCHAR(255) NOT NULL," +
-                "message TEXT NOT NULL," +
-                "source VARCHAR(20) NOT NULL DEFAULT 'contact'," +
-                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                "PRIMARY KEY (id)," +
-                "INDEX idx_enquiries_created_at (created_at)," +
-                "INDEX idx_enquiries_source (source)" +
-            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
-        ).catch(function (error) {
-            tableReadyPromise = null;
-            throw error;
-        });
-    }
-    return tableReadyPromise;
+var ensureEnquiriesTable = async function () {
+    // No-op for Mongoose, but kept for compatibility
+    return true;
 };
 
 var validateEnquiryPayload = function (payload) {
@@ -99,29 +78,29 @@ var validateEnquiryPayload = function (payload) {
 };
 
 var createEnquiry = async function (payload) {
-    await ensureEnquiriesTable();
     var cleaned = validateEnquiryPayload(payload || {});
 
-    var result = await db.query(
-        "INSERT INTO enquiries (full_name, email, phone, address, message, source) VALUES (?, ?, ?, ?, ?, ?)",
-        [cleaned.fullName, cleaned.email, cleaned.phone, cleaned.address, cleaned.message, cleaned.source]
-    );
-
-    var meta = result[0] || {};
-    return {
-        id: Number(meta.insertId || 0),
+    var item = await EnquiryItem.create({
         fullName: cleaned.fullName,
         email: cleaned.email,
         phone: cleaned.phone,
         address: cleaned.address,
         message: cleaned.message,
-        source: cleaned.source,
+        source: cleaned.source
+    });
+
+    return {
+        id: item._id,
+        fullName: item.fullName,
+        email: item.email,
+        phone: item.phone,
+        address: item.address,
+        message: item.message,
+        source: item.source,
     };
 };
 
 var listEnquiries = async function (limit) {
-    await ensureEnquiriesTable();
-
     var numericLimit = Number(limit);
     if (!Number.isInteger(numericLimit) || numericLimit <= 0) {
         numericLimit = DEFAULT_LIMIT;
@@ -130,49 +109,29 @@ var listEnquiries = async function (limit) {
         numericLimit = MAX_LIMIT;
     }
 
-    var result = await db.query(
-        "SELECT id, full_name, email, phone, address, message, source, created_at " +
-        "FROM enquiries ORDER BY created_at DESC LIMIT ?",
-        [numericLimit]
-    );
+    var items = await EnquiryItem.find().sort({ createdAt: -1 }).limit(numericLimit).lean();
 
-    var rows = result[0] || [];
-    return rows.map(function (row) {
+    return items.map(function (row) {
         return {
-            id: Number(row.id || 0),
-            fullName: normalizeText(row.full_name),
-            email: normalizeText(row.email),
-            phone: normalizeText(row.phone),
-            address: normalizeText(row.address),
-            message: normalizeText(row.message),
-            source: normalizeSource(row.source),
-            createdAt: row.created_at,
+            id: row._id,
+            fullName: row.fullName,
+            email: row.email,
+            phone: row.phone,
+            address: row.address,
+            message: row.message,
+            source: row.source,
+            createdAt: row.createdAt,
         };
     });
 };
 
 var deleteEnquiry = async function (id) {
-    await ensureEnquiriesTable();
-
-    var enquiryId = Number(id);
-    if (!Number.isInteger(enquiryId) || enquiryId <= 0) {
-        throw buildBadRequestError("Invalid enquiry id.");
-    }
-
-    var result = await db.query("DELETE FROM enquiries WHERE id=? LIMIT 1", [enquiryId]);
-    var meta = result[0] || {};
-    return Number(meta.affectedRows || 0) > 0;
+    var result = await EnquiryItem.findByIdAndDelete(id);
+    return result != null;
 };
 
 var countEnquiries = async function () {
-    await ensureEnquiriesTable();
-    var result = await db.query("SELECT COUNT(*) AS total FROM enquiries");
-    var rows = result[0] || [];
-    var total = rows.length ? Number(rows[0].total || 0) : 0;
-    if (!Number.isFinite(total) || total < 0) {
-        return 0;
-    }
-    return total;
+    return await EnquiryItem.countDocuments();
 };
 
 module.exports = {

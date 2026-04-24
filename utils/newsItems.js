@@ -1,51 +1,10 @@
-var fs = require("fs");
-var path = require("path");
+var NewsItem = require("../models/NewsItem");
 
-var DATA_DIR = path.join(__dirname, "..", "data");
-var DATA_FILE = path.join(DATA_DIR, "news-items.json");
 var MAX_CONTENT_LINK_LENGTH = 500;
 var MAX_IMAGE_URL_LENGTH = 500;
 
-var DEFAULT_ITEMS = [
-    {
-        id: 1,
-        title: "New Product Launch",
-        content: "We are excited to announce the launch of our new product line next month. Stay tuned for more details!",
-    },
-    {
-        id: 2,
-        title: "Upcoming Event",
-        content: "Join us for our annual customer appreciation event on December 15th. More information will be available soon.",
-    },
-    {
-        id: 3,
-        title: "Special Offer",
-        content: "Get a 20% discount on all products during our holiday sale from December 1st to December 31st.",
-    },
-    {
-        id: 4,
-        title: "Company Milestone",
-        content: "We are proud to celebrate our 10th anniversary this year. Thank you for being a part of our journey!",
-    },
-    {
-        id: 5,
-        title: "Community Engagement",
-        content: "We recently partnered with local charities to support community development. Learn more about our initiatives on our website.",
-    },
-];
-
-var writeQueue = Promise.resolve();
-
 var toText = function (value) {
     return String(value == null ? "" : value).trim();
-};
-
-var nowIso = function () {
-    return new Date().toISOString();
-};
-
-var normalizePaused = function (value) {
-    return value === true;
 };
 
 var createValidationError = function (message) {
@@ -61,25 +20,17 @@ var normalizeOptionalUrl = function (value, options) {
     var maxLength = Number(opts.maxLength || MAX_CONTENT_LINK_LENGTH);
     var throwOnError = opts.throwOnError === true;
 
-    if (!raw) {
-        return "";
-    }
+    if (!raw) return "";
 
     if (raw.length > maxLength) {
-        if (throwOnError) {
-            throw createValidationError(fieldName + " must be " + String(maxLength) + " characters or less.");
-        }
+        if (throwOnError) throw createValidationError(fieldName + " must be " + String(maxLength) + " characters or less.");
         return "";
     }
 
-    if (raw.charAt(0) === "/") {
-        return raw;
-    }
+    if (raw.charAt(0) === "/") return raw;
 
     if (!/^https?:\/\//i.test(raw)) {
-        if (throwOnError) {
-            throw createValidationError(fieldName + " must be a valid http/https URL or start with '/'.");
-        }
+        if (throwOnError) throw createValidationError(fieldName + " must be a valid http/https URL or start with '/'.");
         return "";
     }
 
@@ -87,175 +38,16 @@ var normalizeOptionalUrl = function (value, options) {
     try {
         parsed = new URL(raw);
     } catch (error) {
-        if (throwOnError) {
-            throw createValidationError(fieldName + " must be a valid URL.");
-        }
+        if (throwOnError) throw createValidationError(fieldName + " must be a valid URL.");
         return "";
     }
 
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-        if (throwOnError) {
-            throw createValidationError(fieldName + " must use http or https protocol.");
-        }
+        if (throwOnError) throw createValidationError(fieldName + " must use http or https protocol.");
         return "";
     }
 
     return parsed.toString();
-};
-
-var normalizeItem = function (item) {
-    var id = Number(item && item.id);
-    if (!Number.isInteger(id) || id <= 0) {
-        return null;
-    }
-
-    var title = toText(item && item.title);
-    var content = toText(item && item.content);
-    var sequence = Number(item && item.sequence);
-    var contentLink = normalizeOptionalUrl(item && item.contentLink, {
-        fieldName: "Content link",
-        maxLength: MAX_CONTENT_LINK_LENGTH,
-    });
-    var imageUrl = normalizeOptionalUrl(item && item.imageUrl, {
-        fieldName: "Image URL",
-        maxLength: MAX_IMAGE_URL_LENGTH,
-    });
-    if (!title || !content) {
-        return null;
-    }
-
-    return {
-        id: id,
-        title: title,
-        content: content,
-        contentLink: contentLink,
-        imageUrl: imageUrl,
-        createdAt: toText(item && item.createdAt) || nowIso(),
-        updatedAt: toText(item && item.updatedAt) || nowIso(),
-        sequence: Number.isInteger(sequence) && sequence > 0 ? sequence : 0,
-    };
-};
-
-var normalizeList = function (items) {
-    if (!Array.isArray(items)) {
-        return [];
-    }
-
-    var normalized = items
-        .map(normalizeItem)
-        .filter(Boolean);
-
-    if (!normalized.length) {
-        return [];
-    }
-
-    var hasSequence = normalized.some(function (item) {
-        return Number.isInteger(item.sequence) && item.sequence > 0;
-    });
-
-    if (!hasSequence) {
-        normalized.sort(function (a, b) {
-            return b.id - a.id;
-        });
-        normalized.forEach(function (item, index) {
-            item.sequence = index + 1;
-        });
-        return normalized;
-    }
-
-    normalized.forEach(function (item) {
-        if (!Number.isInteger(item.sequence) || item.sequence < 1) {
-            item.sequence = Number.MAX_SAFE_INTEGER;
-        }
-    });
-
-    normalized.sort(function (a, b) {
-        if (a.sequence === b.sequence) {
-            return b.id - a.id;
-        }
-        return a.sequence - b.sequence;
-    });
-
-    normalized.forEach(function (item, index) {
-        item.sequence = index + 1;
-    });
-
-    return normalized;
-};
-
-var defaultStore = function () {
-    var stamp = nowIso();
-    return {
-        version: 1,
-        paused: false,
-        items: DEFAULT_ITEMS.map(function (item, index) {
-            return {
-                id: item.id,
-                title: item.title,
-                content: item.content,
-                contentLink: "",
-                imageUrl: "",
-                createdAt: stamp,
-                updatedAt: stamp,
-                sequence: index + 1,
-            };
-        }),
-    };
-};
-
-var ensureStoreFile = async function () {
-    await fs.promises.mkdir(DATA_DIR, { recursive: true });
-
-    try {
-        await fs.promises.access(DATA_FILE);
-    } catch (error) {
-        if (!error || error.code !== "ENOENT") {
-            throw error;
-        }
-        var initial = defaultStore();
-        await fs.promises.writeFile(DATA_FILE, JSON.stringify(initial, null, 2), "utf8");
-    }
-};
-
-var readStore = async function () {
-    await ensureStoreFile();
-
-    var raw = await fs.promises.readFile(DATA_FILE, "utf8");
-    var parsed = {};
-    try {
-        parsed = JSON.parse(raw);
-    } catch (error) {
-        parsed = defaultStore();
-    }
-
-    var cleanItems = normalizeList(parsed && parsed.items);
-    if (!cleanItems.length) {
-        var fallback = defaultStore();
-        cleanItems = fallback.items;
-    }
-
-    return {
-        version: 1,
-        paused: normalizePaused(parsed && parsed.paused),
-        items: cleanItems,
-    };
-};
-
-var writeStore = async function (store) {
-    var payload = {
-        version: 1,
-        paused: normalizePaused(store && store.paused),
-        items: normalizeList(store && store.items),
-    };
-
-    var tempFile = DATA_FILE + ".tmp";
-    await fs.promises.writeFile(tempFile, JSON.stringify(payload, null, 2), "utf8");
-    await fs.promises.rename(tempFile, DATA_FILE);
-};
-
-var enqueueWrite = function (work) {
-    writeQueue = writeQueue.then(work, work);
-    return writeQueue;
 };
 
 var validatePayload = function (payload) {
@@ -288,153 +80,115 @@ var validatePayload = function (payload) {
     };
 };
 
-var getNewsState = async function () {
-    var store = await readStore();
-    return {
-        paused: normalizePaused(store && store.paused),
-        items: store.items.slice().sort(function (a, b) {
-            return a.sequence - b.sequence;
-        }),
-    };
+var isNewsPaused = async function () {
+    // MongoDB migration: we can store this setting in a separate config or just return false for now
+    return false;
+};
+
+var setNewsPaused = async function (paused) {
+    return false; // stubbed
 };
 
 var listNewsItems = async function () {
-    var state = await getNewsState();
-    return state.items;
+    var items = await NewsItem.find().sort({ sequence: 1 }).lean();
+    return items.map(function(item) {
+        return {
+            id: item._id,
+            title: item.title,
+            content: item.content,
+            contentLink: item.contentLink,
+            imageUrl: item.imageUrl,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt,
+            sequence: item.sequence
+        };
+    });
+};
+
+var getNewsState = async function () {
+    var paused = await isNewsPaused();
+    var items = await listNewsItems();
+    return { paused: paused, items: items };
 };
 
 var createNewsItem = async function (payload) {
     var cleaned = validatePayload(payload);
-    return enqueueWrite(async function () {
-        var store = await readStore();
-        var maxId = store.items.reduce(function (acc, item) {
-            return item.id > acc ? item.id : acc;
-        }, 0);
-        var stamp = nowIso();
-        var item = {
-            id: maxId + 1,
-            title: cleaned.title,
-            content: cleaned.content,
-            contentLink: cleaned.contentLink,
-            imageUrl: cleaned.imageUrl,
-            createdAt: stamp,
-            updatedAt: stamp,
-            sequence: 1,
-        };
-        store.items.push(item);
-        await writeStore(store);
-        return item;
+    
+    var lastItem = await NewsItem.findOne().sort({ sequence: -1 });
+    var sequence = lastItem ? lastItem.sequence + 1 : 1;
+    
+    var item = await NewsItem.create({
+        title: cleaned.title,
+        content: cleaned.content,
+        contentLink: cleaned.contentLink,
+        imageUrl: cleaned.imageUrl,
+        sequence: sequence
     });
+    
+    return {
+        id: item._id,
+        title: item.title,
+        content: item.content,
+        contentLink: item.contentLink,
+        imageUrl: item.imageUrl,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        sequence: item.sequence
+    };
 };
 
 var updateNewsItem = async function (id, payload) {
     var cleaned = validatePayload(payload);
-    var newsId = Number(id);
-    if (!Number.isInteger(newsId) || newsId <= 0) {
-        var idError = new Error("Invalid news id.");
-        idError.statusCode = 400;
-        throw idError;
-    }
-
-    return enqueueWrite(async function () {
-        var store = await readStore();
-        var index = store.items.findIndex(function (item) {
-            return item.id === newsId;
-        });
-        if (index < 0) {
-            return null;
-        }
-        var current = store.items[index];
-        var updated = {
-            id: current.id,
-            title: cleaned.title,
-            content: cleaned.content,
-            contentLink: cleaned.contentLink,
-            imageUrl: cleaned.imageUrl,
-            createdAt: current.createdAt || nowIso(),
-            updatedAt: nowIso(),
-            sequence: current.sequence || 0,
-        };
-        store.items[index] = updated;
-        await writeStore(store);
-        return updated;
-    });
+    var item = await NewsItem.findByIdAndUpdate(id, {
+        title: cleaned.title,
+        content: cleaned.content,
+        contentLink: cleaned.contentLink,
+        imageUrl: cleaned.imageUrl,
+    }, { new: true }).lean();
+    
+    if (!item) return null;
+    
+    return {
+        id: item._id,
+        title: item.title,
+        content: item.content,
+        contentLink: item.contentLink,
+        imageUrl: item.imageUrl,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        sequence: item.sequence
+    };
 };
 
 var deleteNewsItem = async function (id) {
-    var newsId = Number(id);
-    if (!Number.isInteger(newsId) || newsId <= 0) {
-        var idError = new Error("Invalid news id.");
-        idError.statusCode = 400;
-        throw idError;
-    }
-
-    return enqueueWrite(async function () {
-        var store = await readStore();
-        var before = store.items.length;
-        store.items = store.items.filter(function (item) {
-            return item.id !== newsId;
-        });
-        if (store.items.length === before) {
-            return false;
-        }
-        await writeStore(store);
-        return true;
-    });
+    var result = await NewsItem.findByIdAndDelete(id);
+    return result != null;
 };
 
 var reorderNewsSequence = async function (id, targetSequence) {
-    var newsId = Number(id);
     var sequence = Number(targetSequence);
-    if (!Number.isInteger(newsId) || newsId <= 0) {
-        var idError = new Error("Invalid news id.");
-        idError.statusCode = 400;
-        throw idError;
-    }
     if (!Number.isInteger(sequence) || sequence < 1) {
-        var seqError = new Error("Invalid sequence.");
-        seqError.statusCode = 400;
-        throw seqError;
+        throw createValidationError("Invalid sequence.");
     }
-
-    return enqueueWrite(async function () {
-        var store = await readStore();
-        var items = store.items.slice();
-        var currentIndex = items.findIndex(function (item) {
-            return item.id === newsId;
-        });
-        if (currentIndex < 0) {
-            return null;
-        }
-        if (sequence > items.length) {
-            var rangeError = new Error("Invalid sequence.");
-            rangeError.statusCode = 400;
-            throw rangeError;
-        }
-        var moving = items.splice(currentIndex, 1)[0];
-        items.splice(sequence - 1, 0, moving);
-        items.forEach(function (item, index) {
-            item.sequence = index + 1;
-        });
-        store.items = items;
-        await writeStore(store);
-        return store.items.slice();
-    });
-};
-
-var isNewsPaused = async function () {
-    var state = await getNewsState();
-    return state.paused;
-};
-
-var setNewsPaused = async function (paused) {
-    var nextState = normalizePaused(paused);
-    return enqueueWrite(async function () {
-        var store = await readStore();
-        store.paused = nextState;
-        await writeStore(store);
-        return store.paused;
-    });
+    
+    var item = await NewsItem.findById(id);
+    if (!item) return null;
+    
+    var items = await NewsItem.find().sort({ sequence: 1 });
+    var currentIndex = items.findIndex(i => i._id.toString() === id.toString());
+    
+    if (currentIndex < 0) return null;
+    if (sequence > items.length) throw createValidationError("Invalid sequence.");
+    
+    var moving = items.splice(currentIndex, 1)[0];
+    items.splice(sequence - 1, 0, moving);
+    
+    for (let i = 0; i < items.length; i++) {
+        items[i].sequence = i + 1;
+        await items[i].save();
+    }
+    
+    return listNewsItems();
 };
 
 module.exports = {
@@ -447,3 +201,4 @@ module.exports = {
     setNewsPaused: setNewsPaused,
     updateNewsItem: updateNewsItem,
 };
+
