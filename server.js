@@ -2,6 +2,7 @@ require("dotenv").config();
 var express = require("express");
 var path = require("path");
 var fs = require("fs");
+var fileUploader = require("express-fileupload");
 var adminRoutes = require("./routes/adminRoutes");
 var db = require("./config/db");
 var { connectMongo } = require("./config/mongo");
@@ -182,6 +183,41 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(fileUploader());
 
 app.use("/admin", adminRoutes);
+
+app.post("/upload", fileUploader({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
+    createParentPath: true,
+}), async function (req, res) {
+    if (!req.files || !req.files.picform) {
+        return res.status(400).json({ ok: false, message: "No file uploaded. Use field name 'picform'." });
+    }
+
+    var file = req.files.picform;
+    try {
+        console.log("[Upload] Starting Cloudinary upload for:", file.name);
+        var result = await cloudinary.uploader.upload(file.tempFilePath, {
+            folder: "myapp",
+            resource_type: "auto",
+        });
+
+        var secureUrl = String(result && result.secure_url || "").trim();
+        console.log("[Upload] Cloudinary upload success:", secureUrl);
+
+        return res.json({
+            ok: true,
+            message: "File uploaded successfully.",
+            secure_url: secureUrl,
+        });
+    } catch (error) {
+        console.error("[Upload] Cloudinary upload failed:", error);
+        return res.status(500).json({
+            ok: false,
+            message: "Unable to upload file.",
+            error: error && error.message ? error.message : "Unknown error",
+        });
+    }
+});
 
 app.get("/analytics", async function (req, res) {
     try {

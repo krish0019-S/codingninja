@@ -333,7 +333,7 @@ router.delete("/media/:id", adminAuth, async function(req, res) {
 
 router.post("/cloudinary-upload", adminAuth, fileUploader({ 
     useTempFiles: true, 
-    tempFileDir: path.join(__dirname, "..", "temp"),
+    tempFileDir: "/tmp/",
     createParentPath: true 
 }), async function (req, res) {
     if (!isCloudinaryConfigured) {
