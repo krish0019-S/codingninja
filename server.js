@@ -5,7 +5,7 @@ var fs = require("fs");
 var fileUploader = require("express-fileupload");
 var adminRoutes = require("./routes/adminRoutes");
 var db = require("./config/db");
-var { connectMongo, connectMongoWithRetry } = require("./config/mongo");
+var { connectMongo } = require("./config/mongo");
 var { cloudinary } = require("./config/cloudinary");
 var carouselBanners = require("./utils/carouselBanners");
 var enquiries = require("./utils/enquiries");
@@ -436,8 +436,6 @@ app.post("/enquiry", async function (req, res) {
     }
 
     try {
-        await connectMongoWithRetry();
-
         await enquiries.createEnquiry({
             fullName: fullName,
             email: email,
@@ -451,18 +449,6 @@ app.post("/enquiry", async function (req, res) {
     } catch (error) {
         if (error && error.statusCode === 400) {
             return res.status(400).json({ ok: false, message: error.message });
-        }
-
-        var mongoErrorMessage = String(error && error.message || "");
-        var isMongoUnavailable = Boolean(
-            (error && error.code === "MONGO_URI_MISSING") ||
-            /mongo|mongodb|buffering timed out|server selection/i.test(mongoErrorMessage)
-        );
-        if (isMongoUnavailable) {
-            return res.status(503).json({
-                ok: false,
-                message: "Enquiry service is temporarily unavailable. Please try again shortly.",
-            });
         }
 
         console.error(error);
