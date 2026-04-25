@@ -1,6 +1,15 @@
 var mongoose = require("mongoose");
 var activeConnectionPromise = null;
 var lastMongoError = null;
+var sleep = function (ms) {
+    return new Promise(function (resolve) {
+        setTimeout(resolve, ms);
+    });
+};
+
+var sanitizeMongoUri = function (value) {
+    return String(value == null ? "" : value).trim().replace(/^['"]|['"]$/g, "");
+};
 
 var resolveMongoUri = function () {
     var candidates = [
@@ -16,9 +25,9 @@ var resolveMongoUri = function () {
     ];
 
     for (var i = 0; i < candidates.length; i += 1) {
-        var value = String(candidates[i] || "").trim();
+        var value = sanitizeMongoUri(candidates[i]);
         if (value && /^mongodb(\+srv)?:\/\//i.test(value)) {
-            return value.replace(/^"|"$/g, "");
+            return value;
         }
     }
 
@@ -64,8 +73,37 @@ var getLastMongoError = function () {
     return lastMongoError;
 };
 
+var connectMongoWithRetry = async function (maxAttempts, retryDelayMs) {
+    var attempts = Number(maxAttempts);
+    var delayMs = Number(retryDelayMs);
+    if (!Number.isInteger(attempts) || attempts <= 0) {
+        attempts = Number(process.env.MONGO_CONNECT_RETRY_ATTEMPTS || 3);
+    }
+    if (!Number.isFinite(delayMs) || delayMs < 0) {
+        delayMs = Number(process.env.MONGO_CONNECT_RETRY_DELAY_MS || 1200);
+    }
+
+    var lastError = null;
+    for (var attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+            return await connectMongo();
+        } catch (error) {
+            lastError = error;
+            if (error && error.code === "MONGO_URI_MISSING") {
+                throw error;
+            }
+            if (attempt < attempts) {
+                await sleep(delayMs);
+            }
+        }
+    }
+
+    throw lastError;
+};
+
 module.exports = {
     connectMongo: connectMongo,
+    connectMongoWithRetry: connectMongoWithRetry,
     getLastMongoError: getLastMongoError,
     mongoose: mongoose,
 };
