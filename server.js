@@ -5,7 +5,7 @@ var fs = require("fs");
 var fileUploader = require("express-fileupload");
 var adminRoutes = require("./routes/adminRoutes");
 var db = require("./config/db");
-var { connectMongo } = require("./config/mongo");
+var { connectMongo, connectMongoWithRetry } = require("./config/mongo");
 var { cloudinary } = require("./config/cloudinary");
 var carouselBanners = require("./utils/carouselBanners");
 var enquiries = require("./utils/enquiries");
@@ -436,6 +436,8 @@ app.post("/enquiry", async function (req, res) {
     }
 
     try {
+        await connectMongoWithRetry();
+
         await enquiries.createEnquiry({
             fullName: fullName,
             email: email,
