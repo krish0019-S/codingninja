@@ -453,6 +453,18 @@ app.post("/enquiry", async function (req, res) {
             return res.status(400).json({ ok: false, message: error.message });
         }
 
+        var mongoErrorMessage = String(error && error.message || "");
+        var isMongoUnavailable = Boolean(
+            (error && error.code === "MONGO_URI_MISSING") ||
+            /mongo|mongodb|buffering timed out|server selection/i.test(mongoErrorMessage)
+        );
+        if (isMongoUnavailable) {
+            return res.status(503).json({
+                ok: false,
+                message: "Enquiry service is temporarily unavailable. Please try again shortly.",
+            });
+        }
+
         console.error(error);
         return res.status(500).json({ ok: false, message: "Unable to submit enquiry right now." });
     }
