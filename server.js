@@ -436,6 +436,8 @@ app.post("/enquiry", async function (req, res) {
     }
 
     try {
+        await connectMongo();
+
         await enquiries.createEnquiry({
             fullName: fullName,
             email: email,

@@ -1,4 +1,5 @@
 var mongoose = require("mongoose");
+var activeConnectionPromise = null;
 
 var resolveMongoUri = function () {
     var candidates = [
@@ -23,22 +24,29 @@ var connectMongo = async function () {
         return mongoose.connection;
     }
 
+    if (activeConnectionPromise) {
+        return activeConnectionPromise;
+    }
+
     var mongoUri = resolveMongoUri();
     if (!mongoUri) {
         console.warn("MongoDB URI not found. Set MONGODB_URI (or AtlasUrl) in .env.");
         return null;
     }
 
-    try {
-        await mongoose.connect(mongoUri, {
-            serverSelectionTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 10000),
-        });
+    activeConnectionPromise = mongoose.connect(mongoUri, {
+        serverSelectionTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 10000),
+    }).then(function () {
         console.log("Connected to MongoDB");
         return mongoose.connection;
-    } catch (error) {
+    }).catch(function (error) {
         console.error("MongoDB connection failed:", error && error.message ? error.message : error);
         throw error;
-    }
+    }).finally(function () {
+        activeConnectionPromise = null;
+    });
+
+    return activeConnectionPromise;
 };
 
 module.exports = {
