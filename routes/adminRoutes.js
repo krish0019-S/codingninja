@@ -8,6 +8,7 @@ var { upload } = require("../middleware/upload");
 var adminAuth = require("../middleware/adminAuth");
 var fileUploader = require("express-fileupload");
 var { cloudinary, isCloudinaryConfigured } = require("../config/cloudinary");
+var { connectMongoWithRetry } = require("../config/mongo");
 var db = require("../config/db");
 var MediaItem = require("../models/MediaItem");
 var PortfolioItem = require("../models/PortfolioItem");
@@ -245,6 +246,10 @@ var buildCloudinaryFolderUrl = function (secureUrl) {
     return parts.join("/");
 };
 
+var ensureMongoReady = async function () {
+    await connectMongoWithRetry();
+};
+
 router.get("/test-config", adminAuth, async function (req, res) {
     var mongoStatus = "Checking...";
     try {
@@ -270,6 +275,7 @@ router.get("/test-config", adminAuth, async function (req, res) {
 
 router.get("/media", adminAuth, async function (req, res) {
     try {
+        await ensureMongoReady();
         var media = await MediaItem.find({}).sort({ createdAt: -1 }).lean();
         return res.json({
             ok: true,
@@ -286,6 +292,7 @@ router.post("/save-media", adminAuth, async function (req, res) {
     if (!url) return res.status(400).json({ ok: false, message: "URL is required." });
 
     try {
+        await ensureMongoReady();
         var normalizedType = String(type).toLowerCase() === "video" ? "video" : "image";
         var folder = normalizeCloudinaryFolder(getRequestValue(req, "folder"));
         var folderUrl = String(getRequestValue(req, "folderUrl") || "").trim() || buildCloudinaryFolderUrl(url);
@@ -310,6 +317,7 @@ router.delete("/media/:id", adminAuth, async function(req, res) {
     }
 
     try {
+        await ensureMongoReady();
         var item = await MediaItem.findById(id);
         if (!item) {
             return res.status(404).json({ ok: false, message: "Media not found." });
@@ -347,20 +355,23 @@ router.post("/cloudinary-upload", adminAuth, fileUploader({
     var file = req.files.file;
     var isImage = String(file.mimetype || "").startsWith("image/");
     var folder = normalizeCloudinaryFolder(getRequestValue(req, "folder"));
+    var uploadedResult = null;
 
     try {
         console.log("[Cloudinary] Starting upload for:", file.name, "to folder:", folder);
         
         // Upload to Cloudinary using the file path provided by useTempFiles
-        const result = await cloudinary.uploader.upload(file.tempFilePath, {
+        uploadedResult = await cloudinary.uploader.upload(file.tempFilePath, {
             resource_type: "auto",
             folder: folder
         });
 
-        var secureUrl = String(result.secure_url || "").trim();
+        var secureUrl = String(uploadedResult.secure_url || "").trim();
         var folderUrl = buildCloudinaryFolderUrl(secureUrl);
 
         console.log("[Cloudinary] Upload success:", secureUrl);
+
+        await ensureMongoReady();
 
         // Save metadata to MongoDB
         var item = await MediaItem.create({
@@ -368,8 +379,8 @@ router.post("/cloudinary-upload", adminAuth, fileUploader({
             folder: folder,
             folderUrl: folderUrl,
             type: isImage ? "image" : "video",
-            publicId: String(result.public_id || "").trim(),
-            resourceType: normalizeResourceType(result.resource_type),
+            publicId: String(uploadedResult.public_id || "").trim(),
+            resourceType: normalizeResourceType(uploadedResult.resource_type),
         });
 
         console.log("[MongoDB] Record saved with ID:", item._id);
@@ -382,6 +393,17 @@ router.post("/cloudinary-upload", adminAuth, fileUploader({
 
     } catch (error) {
         console.error("[Upload Error]", error);
+
+        if (uploadedResult && uploadedResult.public_id) {
+            try {
+                await cloudinary.uploader.destroy(String(uploadedResult.public_id), {
+                    resource_type: normalizeResourceType(uploadedResult.resource_type),
+                });
+            } catch (cleanupError) {
+                console.error("[Upload Cleanup Error]", cleanupError);
+            }
+        }
+
         var msg = error.message || "Upload failed.";
         if (error.http_code) msg = "Cloudinary Error (" + error.http_code + "): " + msg;
         

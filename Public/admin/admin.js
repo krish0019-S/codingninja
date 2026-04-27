@@ -744,15 +744,15 @@ $(function () {
         }
 
         var rows = items.map(function (item, index) {
-            var enquiryId = Number(item && item.id);
+            var enquiryId = String(item && item.id != null ? item.id : "").trim();
             var receivedParts = formatDateTimeParts(item && item.createdAt);
             var addressParts = formatAddressPreview(item && item.address);
             var addressTitle = addressParts.truncated ? (' title="' + escapeHtml(addressParts.full) + '"') : "";
             var deleteAction = "-";
-            if (Number.isInteger(enquiryId) && enquiryId > 0) {
+            if (enquiryId) {
                 deleteAction =
                     '<button class="btn btn-outline-danger btn-sm btn-enquiry-delete enquiry-delete-icon-btn" type="button" data-enquiry-id="' +
-                    String(enquiryId) +
+                    escapeHtml(enquiryId) +
                     '" aria-label="Delete enquiry" title="Delete enquiry">' +
                     '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
                         '<path d="M4 7h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>' +
@@ -3767,8 +3767,8 @@ $(function () {
         }
 
         var button = $(this);
-        var enquiryId = Number(button.data("enquiryId"));
-        if (!Number.isInteger(enquiryId) || enquiryId <= 0) {
+        var enquiryId = String(button.data("enquiryId") == null ? "" : button.data("enquiryId")).trim();
+        if (!enquiryId) {
             showAlert("Invalid enquiry id.", "danger");
             return;
         }
@@ -3780,7 +3780,7 @@ $(function () {
         button.prop("disabled", true);
 
         $.ajax({
-            url: "/admin/enquiries/" + encodeURIComponent(String(enquiryId)),
+            url: "/admin/enquiries/" + encodeURIComponent(enquiryId),
             method: "DELETE",
             headers: getAuthHeaders(),
             success: function (response) {

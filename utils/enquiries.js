@@ -1,4 +1,5 @@
 var EnquiryItem = require("../models/EnquiryItem");
+var { connectMongoWithRetry } = require("../config/mongo");
 
 var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var PHONE_REGEX = /^(?:\+\d{1,3}\s)?\d{10}$/;
@@ -79,6 +80,7 @@ var validateEnquiryPayload = function (payload) {
 
 var createEnquiry = async function (payload) {
     var cleaned = validateEnquiryPayload(payload || {});
+    await connectMongoWithRetry();
 
     var item = await EnquiryItem.create({
         fullName: cleaned.fullName,
@@ -108,6 +110,7 @@ var listEnquiries = async function (limit) {
     if (numericLimit > MAX_LIMIT) {
         numericLimit = MAX_LIMIT;
     }
+    await connectMongoWithRetry();
 
     var items = await EnquiryItem.find().sort({ createdAt: -1 }).limit(numericLimit).lean();
 
@@ -126,11 +129,13 @@ var listEnquiries = async function (limit) {
 };
 
 var deleteEnquiry = async function (id) {
+    await connectMongoWithRetry();
     var result = await EnquiryItem.findByIdAndDelete(id);
     return result != null;
 };
 
 var countEnquiries = async function () {
+    await connectMongoWithRetry();
     return await EnquiryItem.countDocuments();
 };
 
