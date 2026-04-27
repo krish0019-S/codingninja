@@ -407,9 +407,17 @@ app.get("/electrronic-ads", function (req, resp) {
     resp.sendFile(fullpath);
 });
 
+app.get("/electronic-ads", function (req, resp) {
+    let dirName = __dirname;
+    let fullpath = dirName + "/Public/electrronic-ads.html";
+    resp.sendFile(fullpath);
+});
+
 app.get("/signup", function (req, resp) {
     let dirName = __dirname;
-    let fullpath = dirName + "/Public/signup.html";
+    let signupPath = dirName + "/Public/signup.html";
+    let fallbackLoginPath = dirName + "/Public/login.html";
+    let fullpath = fs.existsSync(signupPath) ? signupPath : fallbackLoginPath;
     resp.sendFile(fullpath);
 });
 
