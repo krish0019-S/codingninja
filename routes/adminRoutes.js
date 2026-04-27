@@ -5,6 +5,8 @@ var jwt = require("jsonwebtoken");
 var nodemailer = require("nodemailer");
 var multer = require("multer");
 var { upload } = require("../middleware/upload");
+var { handleSingleImageUpload } = require("../middleware/imageUpload");
+var { uploadImageDirectToCloudinary } = require("../controllers/imageUploadController");
 var adminAuth = require("../middleware/adminAuth");
 var fileUploader = require("express-fileupload");
 var { cloudinary, isCloudinaryConfigured } = require("../config/cloudinary");
@@ -250,21 +252,6 @@ var ensureMongoReady = async function () {
     await connectMongoWithRetry();
 };
 
-var cleanupTempUploadFile = async function (file) {
-    var tempPath = String(file && file.tempFilePath || "").trim();
-    if (!tempPath) {
-        return;
-    }
-
-    try {
-        await fs.promises.unlink(tempPath);
-    } catch (error) {
-        if (!error || error.code !== "ENOENT") {
-            console.error("[Upload Cleanup Error]", error);
-        }
-    }
-};
-
 router.get("/test-config", adminAuth, async function (req, res) {
     var mongoStatus = "Checking...";
     try {
@@ -354,82 +341,12 @@ router.delete("/media/:id", adminAuth, async function(req, res) {
     }
 });
 
-router.post("/cloudinary-upload", adminAuth, fileUploader({ 
-    useTempFiles: true, 
-    tempFileDir: "/tmp/",
-    createParentPath: true 
-}), async function (req, res) {
-    if (!isCloudinaryConfigured) {
-        return res.status(500).json({ ok: false, message: "Cloudinary is not configured on server." });
-    }
-
-    if (!req.files || !req.files.file) {
-        return res.status(400).json({ ok: false, message: "No file uploaded." });
-    }
-
-    var file = req.files.file;
-    var isImage = String(file.mimetype || "").startsWith("image/");
-    var folder = normalizeCloudinaryFolder(getRequestValue(req, "folder"));
-    var uploadedResult = null;
-
-    try {
-        console.log("[Cloudinary] Starting upload for:", file.name, "to folder:", folder);
-        
-        // Upload to Cloudinary using the file path provided by useTempFiles
-        uploadedResult = await cloudinary.uploader.upload(file.tempFilePath, {
-            resource_type: "auto",
-            folder: folder
-        });
-
-        var secureUrl = String(uploadedResult.secure_url || "").trim();
-        var folderUrl = buildCloudinaryFolderUrl(secureUrl);
-
-        console.log("[Cloudinary] Upload success:", secureUrl);
-
-        await ensureMongoReady();
-
-        // Save metadata to MongoDB
-        var item = await MediaItem.create({
-            url: secureUrl,
-            folder: folder,
-            folderUrl: folderUrl,
-            type: isImage ? "image" : "video",
-            publicId: String(uploadedResult.public_id || "").trim(),
-            resourceType: normalizeResourceType(uploadedResult.resource_type),
-        });
-
-        console.log("[MongoDB] Record saved with ID:", item._id);
-
-        return res.json({ 
-            ok: true, 
-            message: "Media saved successfully to Cloud and Database.", 
-            item: serializeMediaItem(item) 
-        });
-
-    } catch (error) {
-        console.error("[Upload Error]", error);
-
-        if (uploadedResult && uploadedResult.public_id) {
-            try {
-                await cloudinary.uploader.destroy(String(uploadedResult.public_id), {
-                    resource_type: normalizeResourceType(uploadedResult.resource_type),
-                });
-            } catch (cleanupError) {
-                console.error("[Upload Cleanup Error]", cleanupError);
-            }
-        }
-
-        var msg = error.message || "Upload failed.";
-        if (error.http_code) msg = "Cloudinary Error (" + error.http_code + "): " + msg;
-        
-        return res.status(500).json({ 
-            ok: false, 
-            message: msg 
-        });
-    } finally {
-        await cleanupTempUploadFile(file);
-    }
-});
+router.post(
+    "/cloudinary-upload",
+    adminAuth,
+    handleSingleImageUpload("file"),
+    uploadImageDirectToCloudinary
+);
 
 var listPortfolioFoldersOrdered = async function (category) {
     var folders = await listPortfolioFolders(category);

@@ -2,11 +2,11 @@ require("dotenv").config();
 var express = require("express");
 var path = require("path");
 var fs = require("fs");
-var fileUploader = require("express-fileupload");
 var adminRoutes = require("./routes/adminRoutes");
 var db = require("./config/db");
 var { connectMongo, connectMongoWithRetry } = require("./config/mongo");
-var { cloudinary } = require("./config/cloudinary");
+var { handleSingleImageUpload } = require("./middleware/imageUpload");
+var { uploadImageDirectToCloudinary } = require("./controllers/imageUploadController");
 var carouselBanners = require("./utils/carouselBanners");
 var enquiries = require("./utils/enquiries");
 var newsItems = require("./utils/newsItems");
@@ -176,65 +176,9 @@ app.use(express.static("Public"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Note: Using app.use(fileUploader()) globally here will break your existing Multer routes
-// (like portfolio and gallery uploads). Instead, we apply the fileUploader specifically 
-// to the Cloudinary upload route inside adminRoutes.js.
-// var fileUploader = require("express-fileupload");
-// app.use(fileUploader());
-
 app.use("/admin", adminRoutes);
 
-var cleanupTempUploadFile = async function (file) {
-    var tempPath = String(file && file.tempFilePath || "").trim();
-    if (!tempPath) {
-        return;
-    }
-
-    try {
-        await fs.promises.unlink(tempPath);
-    } catch (error) {
-        if (!error || error.code !== "ENOENT") {
-            console.error("[Upload] Temp file cleanup failed:", error);
-        }
-    }
-};
-
-app.post("/upload", fileUploader({
-    useTempFiles: true,
-    tempFileDir: "/tmp/",
-    createParentPath: true,
-}), async function (req, res) {
-    if (!req.files || !req.files.picform) {
-        return res.status(400).json({ ok: false, message: "No file uploaded. Use field name 'picform'." });
-    }
-
-    var file = req.files.picform;
-    try {
-        console.log("[Upload] Starting Cloudinary upload for:", file.name);
-        var result = await cloudinary.uploader.upload(file.tempFilePath, {
-            folder: "myapp",
-            resource_type: "auto",
-        });
-
-        var secureUrl = String(result && result.secure_url || "").trim();
-        console.log("[Upload] Cloudinary upload success:", secureUrl);
-
-        return res.json({
-            ok: true,
-            message: "File uploaded successfully.",
-            secure_url: secureUrl,
-        });
-    } catch (error) {
-        console.error("[Upload] Cloudinary upload failed:", error);
-        return res.status(500).json({
-            ok: false,
-            message: "Unable to upload file.",
-            error: error && error.message ? error.message : "Unknown error",
-        });
-    } finally {
-        await cleanupTempUploadFile(file);
-    }
-});
+app.post("/upload", handleSingleImageUpload("picform"), uploadImageDirectToCloudinary);
 
 app.get("/analytics", async function (req, res) {
     try {
