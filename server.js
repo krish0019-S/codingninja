@@ -475,8 +475,9 @@ app.post("/enquiry", async function (req, res) {
     }
 });
 
-app.listen(1502, () => {
-    console.log("Server running on port 1502");
+var PORT = Number(process.env.PORT) || 1502;
+app.listen(PORT, "0.0.0.0", function () {
+    console.log("Server running on port " + String(PORT));
 });
 
 connectMongo().catch(function () {
