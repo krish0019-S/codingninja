@@ -529,7 +529,7 @@
     z-index: 4200;
     display: none;
     place-items: center;
-    padding: 22px;
+    padding: 0;
 }
 
 .gallery-lightbox.is-open {
@@ -545,42 +545,51 @@
 .gallery-lightbox-panel {
     position: relative;
     z-index: 1;
-    width: min(980px, 95vw);
-    border-radius: 20px;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
     overflow: hidden;
     background: #0f1117;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 0;
     box-shadow: 0 30px 70px rgba(0, 0, 0, 0.48);
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .gallery-lightbox-close {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 36px;
-    height: 36px;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     border: 0;
     background: rgba(0, 0, 0, 0.62);
     color: #fff;
-    font-size: 1.2rem;
+    font-size: 1.35rem;
     line-height: 1;
+    z-index: 2;
 }
 
 .gallery-lightbox img {
     width: 100%;
-    max-height: min(72vh, 820px);
+    height: 100%;
+    max-height: none;
     object-fit: contain;
     display: block;
     background: #0f1117;
+    padding: max(56px, calc(env(safe-area-inset-top) + 48px)) 14px 14px;
 }
 
 .gallery-lightbox video {
     width: 100%;
-    max-height: min(72vh, 820px);
+    height: 100%;
+    max-height: none;
     object-fit: contain;
     display: block;
     background: #0f1117;
+    padding: max(56px, calc(env(safe-area-inset-top) + 48px)) 14px 14px;
 }
 
 .gallery-lightbox[data-lightbox-fullscreen] {
@@ -697,11 +706,11 @@ body.gallery-lightbox-open {
     }
 
     .gallery-lightbox-panel {
-        width: min(1320px, 92vw);
+        width: 100vw;
     }
 
     .gallery-lightbox img {
-        max-height: min(78vh, 1080px);
+        max-height: none;
     }
 }
 
@@ -728,7 +737,7 @@ body.gallery-lightbox-open {
     }
 
     .gallery-lightbox-panel {
-        width: min(1680px, 90vw);
+        width: 100vw;
     }
 }
 
@@ -781,7 +790,7 @@ body.gallery-lightbox-open {
     }
 
     .gallery-lightbox {
-        padding: 12px;
+        padding: 0;
     }
 }
 
