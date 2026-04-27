@@ -184,6 +184,21 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/admin", adminRoutes);
 
+var cleanupTempUploadFile = async function (file) {
+    var tempPath = String(file && file.tempFilePath || "").trim();
+    if (!tempPath) {
+        return;
+    }
+
+    try {
+        await fs.promises.unlink(tempPath);
+    } catch (error) {
+        if (!error || error.code !== "ENOENT") {
+            console.error("[Upload] Temp file cleanup failed:", error);
+        }
+    }
+};
+
 app.post("/upload", fileUploader({
     useTempFiles: true,
     tempFileDir: "/tmp/",
@@ -216,6 +231,8 @@ app.post("/upload", fileUploader({
             message: "Unable to upload file.",
             error: error && error.message ? error.message : "Unknown error",
         });
+    } finally {
+        await cleanupTempUploadFile(file);
     }
 });
 

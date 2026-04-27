@@ -3,3 +3,15 @@ node_modules
 /tmp
 /public/uploads
 /Public/uploads
+
+# Upload/storage directories detected from runtime code
+/Public/news-files/
+/Public/images/gallery/**
+!/Public/images/gallery/.gitkeep
+/Public/videos/gallery/**
+!/Public/videos/gallery/.gitkeep
+/Public/portfolio/**
+
+# Common local temp upload locations
+/tmp/**
+/temp/**

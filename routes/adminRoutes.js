@@ -250,6 +250,21 @@ var ensureMongoReady = async function () {
     await connectMongoWithRetry();
 };
 
+var cleanupTempUploadFile = async function (file) {
+    var tempPath = String(file && file.tempFilePath || "").trim();
+    if (!tempPath) {
+        return;
+    }
+
+    try {
+        await fs.promises.unlink(tempPath);
+    } catch (error) {
+        if (!error || error.code !== "ENOENT") {
+            console.error("[Upload Cleanup Error]", error);
+        }
+    }
+};
+
 router.get("/test-config", adminAuth, async function (req, res) {
     var mongoStatus = "Checking...";
     try {
@@ -411,6 +426,8 @@ router.post("/cloudinary-upload", adminAuth, fileUploader({
             ok: false, 
             message: msg 
         });
+    } finally {
+        await cleanupTempUploadFile(file);
     }
 });
 
